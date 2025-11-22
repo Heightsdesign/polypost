@@ -1,0 +1,26 @@
+/* App.css
+   Light, layout-only styles to complement Tailwind.
+   No colors or fonts here – Tailwind handles that.
+*/
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app main {
+  flex: 1;
+  width: 100%;      /* instead of max-width + margin auto */
+  margin: 0;        /* ensure no margin */
+  padding: 0;       /* optional */
+}
+
+/* Optional: small tweak for links in the navbar if they ever fall back to plain CSS */
+.app a {
+  text-decoration: none;
+}
+
+.pricing-btn {
+  @apply w-full inline-flex items-center justify-center px-4 py-2.5 rounded-2xl text-sm font-semibold text-white bg-gradient-to-r from-purple to-pink shadow-md shadow-purple/30 hover:shadow-purple/40 hover:-translate-y-[1px] active:translate-y-0 transition-all;
+}

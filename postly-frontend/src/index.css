@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ----------------------------------------------------
+   Global App Styles — Postly Theme
+   (no @apply to avoid Tailwind v4 issues)
+---------------------------------------------------- */
+/* --------- GLOBAL RESET --------- */
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: white;
+  color: #2D2D4A;            /* dark */
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Links */
+a {
+  text-decoration: none;
+  color: #6C63FF; /* purple */
+  font-weight: 500;
+}
+a:hover {
+  color: #8a7dff;
+}
+
+/* Buttons: base style – you can still override with Tailwind classes in components */
+button {
+  border-radius: 12px;
+  border: none;
+  padding: 0.6rem 1.4rem;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: inherit;
+  background-color: #6C63FF;
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(108, 99, 255, 0.3);
+  transition: background-color 0.15s ease, transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+button:hover {
+  background-color: #5a52e6;
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(108, 99, 255, 0.35);
+}
+button:active {
+  transform: translateY(0);
+  box-shadow: 0 8px 18px rgba(108, 99, 255, 0.25);
+}
+
+/* Headings */
+h1,
+h2,
+h3,
+h4 {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 800;
+}
+
+/* Utility-ish helpers (plain CSS) */
+.hero-title {
+  font-size: clamp(2.75rem, 4vw, 3.5rem);
+  line-height: 1.1;
+  font-weight: 800;
+}
+
+.hero-text {
+  font-size: 1.05rem;
+  max-width: 38rem;
+  margin-inline: auto;
+  color: rgba(45, 45, 74, 0.8);
+}
+
+/* Floating blob animation */
+@keyframes blobFloatSlow {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.blob-float-slow {
+  animation: blobFloatSlow 12s ease-in-out infinite;
+}
