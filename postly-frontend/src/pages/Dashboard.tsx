@@ -249,8 +249,8 @@ export default function Dashboard() {
         style={{
           zIndex: 0,
           backgroundImage: `
-            radial-gradient(120% 200% at 0% 0%, rgba(255, 111, 145, 0.14), transparent 60%),
-            radial-gradient(120% 200% at 100% 100%, rgba(88, 80, 235, 0.18), transparent 60%)
+            radial-gradient(120% 200% at 0% 0%, rgba(111, 161, 255, 0.14), transparent 60%),
+            radial-gradient(120% 200% at 100% 100%, rgba(139, 80, 235, 0.18), transparent 60%)
           `,
         }}
       />
