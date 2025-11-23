@@ -12,17 +12,16 @@ from django.conf import settings
 
 from .models import (
     MediaUpload, GeneratedCaption, CreatorProfile, 
-    SavedIdea, GlobalTrend, PlannedPostSlot,
+    GlobalTrend, PlannedPostSlot, UseCaseTemplate,
     PlatformTiming, PostPerformance, Plan, 
     Subscription, Draft, MediaUpload, GeneratedCaption,
-    UseCaseTemplate
+    
     )
 
 from .serializers import (
     MediaUploadSerializer, RegisterSerializer, CaptionGenerateSerializer,
-    GeneratedCaptionSerializer, SavedIdeaSerializer, PlannedPostSlotSerializer,
+    GeneratedCaptionSerializer, PlannedPostSlotSerializer, CreatorProfileSerializer,
     PostPerformanceSerializer, DraftSerializer, UseCaseTemplateSerializer,
-    CreatorProfileSerializer
     )
 
 from .utils import (
@@ -271,23 +270,7 @@ class GenerateIdeasView(views.APIView):
 
         increment_usage(user, "idea")
         return Response({"ideas": ideas}, status=status.HTTP_200_OK)
-
-class SavedIdeaListCreateView(generics.ListCreateAPIView):
-    serializer_class = SavedIdeaSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        return SavedIdea.objects.filter(user=self.request.user).order_by("-created_at")
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-
-class SavedIdeaDetailView(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = SavedIdeaSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        return SavedIdea.objects.filter(user=self.request.user)
+    
     
 class PostingSuggestionView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]

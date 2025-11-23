@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import MediaUpload, GeneratedCaption, SavedIdea, PlannedPostSlot, PostPerformance, Draft, MediaUpload, GeneratedCaption, CreatorProfile, UseCaseTemplate
+from .models import MediaUpload, GeneratedCaption, PlannedPostSlot, PostPerformance, Draft, MediaUpload, GeneratedCaption, CreatorProfile, UseCaseTemplate
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -113,11 +113,6 @@ class GeneratedCaptionSerializer(serializers.ModelSerializer):
         model = GeneratedCaption
         fields = ("id", "text", "is_user_edited", "created_at")
 
-class SavedIdeaSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = SavedIdea
-        fields = "__all__"
-        read_only_fields = ("id", "user", "created_at")
 
 class PlannedPostSlotSerializer(serializers.ModelSerializer):
     class Meta:

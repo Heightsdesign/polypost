@@ -2,7 +2,7 @@ from django.urls import path
 from rest_framework_simplejwt.views import (
     TokenObtainPairView, TokenRefreshView
 )
-from .views import RegisterView, GenerateIdeasView, SavedIdeaListCreateView, SavedIdeaDetailView
+from .views import RegisterView, GenerateIdeasView
 
 from rest_framework.routers import DefaultRouter
 from .views import (
@@ -31,8 +31,6 @@ urlpatterns = [
     path("auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("captions/generate/", GenerateCaptionView.as_view(), name="caption-generate"),
     path("ideas/generate/", GenerateIdeasView.as_view(), name="ideas-generate"),
-    path("ideas/", SavedIdeaListCreateView.as_view(), name="ideas-list-create"),
-    path("ideas/<int:pk>/", SavedIdeaDetailView.as_view(), name="ideas-detail"),
     path("scheduler/suggestions/", PostingSuggestionView.as_view(), name="posting-suggestions"),
     path("scheduler/plan/", PlanSlotView.as_view(), name="scheduler-plan"),
     path("scheduler/my/", MyPlannedSlotsView.as_view(), name="scheduler-my"),

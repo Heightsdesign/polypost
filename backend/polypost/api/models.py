@@ -198,24 +198,6 @@ class EngagementTip(models.Model):
 # 4.  BILLING (very lean MVP)
 # ------------------------------------------------------------------
 
-
-class SavedIdea(models.Model):
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="saved_ideas"
-    )
-    title = models.CharField(max_length=255)
-    description = models.TextField(blank=True)
-    suggested_caption_starter = models.TextField(blank=True)
-    hook_used = models.CharField(max_length=255, blank=True)
-    personal_twist = models.TextField(blank=True)
-    pinned = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.user.username} - {self.title}"
-    
 class GlobalTrend(models.Model):
     PLATFORM_CHOICES = [
         ("tiktok", "TikTok"),
