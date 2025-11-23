@@ -1,7 +1,10 @@
+// src/pages/Dashboard.tsx
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import api from "../api";
 import ReviewsSection from "../components/ReviewSection";
 
+// blobs & bg
 import BlobRed from "../assets/blobs/blob-1.png";
 import BlobPurple from "../assets/blobs/blob-2.png";
 import BlobYellow from "../assets/blobs/blob-3.png";
@@ -15,66 +18,66 @@ import BlobRedLarge from "../assets/blobs/blob-1.png";
 import BlobBlue from "../assets/blobs/blob-7.png";
 import BgBlur from "../assets/blobs/bg-blur.png";
 
+// ---------------- Modal ----------------
 
-// a tiny reusable modal
-function Modal({
-  open,
-  onClose,
-  title,
-  children,
-}: {
+type ModalProps = {
   open: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
-}) {
+};
+
+function Modal({ open, onClose, title, children }: ModalProps) {
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-[min(90%,700px)] max-h-[80vh] overflow-y-auto rounded-2xl bg-white/25 p-5 shadow-2xl"
+        className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-3xl bg-white/95 p-5 md:p-6 shadow-2xl border border-purple/10"
       >
-        <div className="mb-3 flex items-center justify-between gap-4">
-          <h2 className="m-0 text-lg font-semibold text-dark">{title}</h2>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h2 className="text-lg font-semibold text-dark">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded-full bg-purple/10 px-2 py-1 text-xs font-semibold text-dark hover:bg-purple/20"
+            className="h-8 w-8 flex items-center justify-center rounded-full bg-purple/5 text-dark/70 hover:bg-purple/10"
+            type="button"
           >
             ✕
           </button>
         </div>
-        <div>{children}</div>
+        <div className="text-sm text-dark/80">{children}</div>
       </div>
     </div>
   );
 }
 
+// ---------------- Dashboard ----------------
+
 export default function Dashboard() {
-  // modal states
+  // modals
   const [openIdeas, setOpenIdeas] = useState(false);
   const [openUpload, setOpenUpload] = useState(false);
   const [openScheduler, setOpenScheduler] = useState(false);
 
-  // IDEA state
+  // ideas
   const [ideas, setIdeas] = useState<any[]>([]);
   const [ideasLoading, setIdeasLoading] = useState(false);
 
-  // UPLOAD state
+  // upload
   const [file, setFile] = useState<File | null>(null);
   const [uploadId, setUploadId] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
   const [uploadStatus, setUploadStatus] = useState("");
 
-  // SCHEDULER state
+  // scheduler
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [mySlots, setMySlots] = useState<any[]>([]);
   const [schedulerLoading, setSchedulerLoading] = useState(false);
 
-  // DRAFTS state
+  // drafts
   const [recentDrafts, setRecentDrafts] = useState<any[]>([]);
 
   useEffect(() => {
@@ -82,13 +85,13 @@ export default function Dashboard() {
       try {
         const res = await api.get("/drafts/?limit=3");
         setRecentDrafts(res.data || []);
-      } catch (err) {
+      } catch {
         // non-blocking
       }
     })();
   }, []);
 
-  // load scheduler suggestions when modal opens
+  // load scheduler when modal opens
   useEffect(() => {
     if (!openScheduler) return;
     (async () => {
@@ -108,7 +111,8 @@ export default function Dashboard() {
     })();
   }, [openScheduler]);
 
-  // IDEA: call backend
+  // ----- handlers -----
+
   async function handleGenerateIdeas() {
     setIdeasLoading(true);
     try {
@@ -129,7 +133,6 @@ export default function Dashboard() {
     }
   }
 
-  // UPLOAD: upload file
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault();
     if (!file) return;
@@ -148,7 +151,6 @@ export default function Dashboard() {
     }
   }
 
-  // UPLOAD: caption
   async function handleGenerateCaption() {
     if (!uploadId) {
       setUploadStatus("Upload first.");
@@ -166,7 +168,6 @@ export default function Dashboard() {
     }
   }
 
-  // SCHEDULER: save a slot
   async function handleSaveSlot(slot: any) {
     try {
       await api.post("/scheduler/plan/", {
@@ -177,7 +178,6 @@ export default function Dashboard() {
       });
       const mine = await api.get("/scheduler/my/");
       setMySlots(mine.data || []);
-      // mark in suggestions
       setSuggestions((prev) =>
         prev.map((day: any) => ({
           ...day,
@@ -193,10 +193,24 @@ export default function Dashboard() {
     }
   }
 
+  // ---------------- UI ----------------
+
   return (
-    <div className="relative overflow-hidden min-h-screen bg-offwhite">
-      {/* soft background gradient like landing */}
-      {/* Large soft blur center */}
+    <div className="relative min-h-screen overflow-hidden bg-offwhite">
+      {/* soft diagonal lens gradient */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          zIndex: 0,
+          backgroundImage: `
+            radial-gradient(120% 200% at 0% 0%, rgba(255, 111, 145, 0.14), transparent 60%),
+            radial-gradient(120% 200% at 100% 100%, rgba(88, 80, 235, 0.18), transparent 60%)
+          `,
+          opacity: 0.6,
+        }}
+      />
+
+      {/* center blur */}
       <img
         src={BgBlur}
         alt=""
@@ -207,217 +221,210 @@ export default function Dashboard() {
           transform: "translate(-50%, -50%)",
           width: "2000px",
           height: "auto",
-          opacity: 0.25,
+          opacity: 0.18,
           zIndex: 0,
         }}
       />
 
-      {/* Top-left blended blobs */}
+      {/* edge blobs */}
       <img
         src={BlobRed}
         alt=""
-        className="pointer-events-none absolute"
-        style={{
-          top: "-180px",
-          left: "-200px",
-          width: "420px",
-          opacity: 0.70,
-          zIndex: 0,
-        }}
+        className="pointer-events-none absolute -left-40 -top-20 w-72 md:w-96 opacity-80"
       />
-
       <img
-        src={BlobYellowSmall}
+        src={BlobPurple}
         alt=""
-        className="pointer-events-none absolute"
-        style={{
-          top: "40px",
-          left: "280px",
-          width: "140px",
-          opacity: 0.45,
-          zIndex: 0,
-        }}
+        className="pointer-events-none absolute -right-40 top-10 w-80 opacity-80"
       />
-
-      {/* Top-right large purple shape */}
-      <img
-        src={BlobPurpleLarge}
-        alt=""
-        className="pointer-events-none absolute"
-        style={{
-          top: "-160px",
-          right: "-200px",
-          width: "540px",
-          opacity: 0.30,
-          transform: "rotate(-18deg)",
-          zIndex: 0,
-        }}
-      />
-
-      {/* Mid-left blob for balance */}
-      <img
-        src={BlobPurpleDot}
-        alt=""
-        className="pointer-events-none absolute"
-        style={{
-          top: "380px",
-          left: "-40px",
-          width: "220px",
-          opacity: 0.55,
-          transform: "rotate(12deg)",
-          zIndex: 0,
-        }}
-      />
-
-      {/* Bottom-right bleed */}
-      <img
-        src={BlobGreen}
-        alt=""
-        className="pointer-events-none absolute"
-        style={{
-          bottom: "-200px",
-          right: "-240px",
-          width: "500px",
-          opacity: 0.75,
-          transform: "rotate(-8deg)",
-          zIndex: 0,
-        }}
-      />
-
-      {/* Bottom-left blue bubble */}
       <img
         src={BlobBlue}
         alt=""
-        className="pointer-events-none absolute"
-        style={{
-          bottom: "-170px",
-          left: "80px",
-          width: "450px",
-          opacity: 0.70,
-          transform: "rotate(4deg)",
-          zIndex: 0,
-        }}
+        className="pointer-events-none absolute -left-32 bottom-[-160px] w-[420px] opacity-80"
+      />
+      <img
+        src={BlobGreen}
+        alt=""
+        className="pointer-events-none absolute -right-48 bottom-[-140px] w-[420px] opacity-80"
+      />
+      <img
+        src={BlobYellowSmall}
+        alt=""
+        className="pointer-events-none absolute left-52 top-6 w-28 opacity-40 blob-float-slow"
+      />
+      <img
+        src={BlobRedSmall}
+        alt=""
+        className="pointer-events-none absolute left-[-40px] bottom-[-40px] w-40 opacity-80"
+      />
+      <img
+        src={BlobPurpleDot}
+        alt=""
+        className="pointer-events-none absolute left-[-40px] top-64 w-40 opacity-80 rotate-[10deg]"
+      />
+      <img
+        src={BlobOrange}
+        alt=""
+        className="pointer-events-none absolute left-[-220px] top-[-160px] w-[420px] opacity-80 rotate-[18deg]"
+      />
+      <img
+        src={BlobRedLarge}
+        alt=""
+        className="pointer-events-none absolute right-40 bottom-[-120px] w-80 opacity-80 rotate-[12deg]"
+      />
+      <img
+        src={BlobPurpleLarge}
+        alt=""
+        className="pointer-events-none absolute right-[-140px] top-[-120px] w-[420px] opacity-40 rotate-[-16deg]"
       />
 
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          zIndex: 0,
-          backgroundImage: `
-            radial-gradient(120% 200% at 0% 0%, rgba(255, 111, 145, 0.14), transparent 60%),
-            radial-gradient(120% 200% at 100% 100%, rgba(88, 80, 235, 0.18), transparent 60%)
-          `,
-          opacity: 0.5,
-        }}
-      />
-
-      {/* a couple of simple blobs */}
-      <div className="pointer-events-none absolute -top-20 -left-24 h-52 w-52 rounded-full bg-yellow/40 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-[-120px] right-[-80px] h-64 w-64 rounded-full bg-teal/35 blur-3xl" />
-
+      {/* CONTENT */}
       <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 py-8 md:py-12">
-        {/* Header */}
-        <header className="mb-6 md:mb-8">
-          <p className="text-xs font-semibold tracking-[0.2em] uppercase text-purple/80 mb-2">
-            Dashboard
+         {/* CENTER BLUR BLOBS */}
+        <div className="pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2">
+          <div
+            className="hidden md:block absolute"
+            style={{
+              width: 280,
+              height: 280,
+              borderRadius: "999px",
+              background: "rgba(212, 109, 238, 0.35)",
+              filter: "blur(70px)",
+              top: "-40px",
+              left: "-160px",
+            }}
+          />
+          <div
+            className="hidden md:block absolute"
+            style={{
+              width: 320,
+              height: 320,
+              borderRadius: "999px",
+              background: "rgba(69, 1, 255, 0.35)",
+              filter: "blur(80px)",
+              top: "120px",
+              left: "80px",
+            }}
+          />
+        </div>
+        {/* header */}
+        <header className="mb-8">
+          <p className="text-xs font-semibold tracking-[0.18em] uppercase text-purple mb-2">
+            Welcome back
           </p>
           <h1 className="text-2xl md:text-3xl font-extrabold text-dark mb-2">
-            Your <span className="text-purple">creator cockpit</span>
+            Your creator <span className="text-purple">control center</span>
           </h1>
-          <p className="text-sm md:text-[0.95rem] text-dark/70 max-w-2xl">
-            Generate ideas, prep captions and schedule great posting times —
-            all in one place.
+          <p className="text-sm md:text-[0.95rem] text-dark/70 max-w-xl">
+            Generate ideas, prep captions and schedule your next posts — all in
+            one place.
           </p>
         </header>
 
-        {/* Main cards */}
-        <section className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-8">
+        {/* top cards */}
+        <section className="grid gap-5 md:grid-cols-3 mb-8">
           {/* Idea card */}
-          <div className="rounded-3xl border border-purple/10 bg-white/25 p-4 md:p-5 shadow-md shadow-purple/5">
-            <h2 className="text-base md:text-lg font-semibold text-dark flex items-center gap-2">
-              <span>💡</span> Idea Generator
-            </h2>
-            <p className="mt-1 text-xs md:text-sm text-dark/70">
-              Generate 5 ideas based on trends and your creator profile.
-            </p>
+          <div className="rounded-3xl bg-white/40 backdrop-blur-xl border border-white/20 shadow-md p-5 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xl">💡</span>
+                <h2 className="text-sm md:text-base font-semibold text-dark">
+                  Idea Generator
+                </h2>
+              </div>
+              <p className="text-xs md:text-sm text-dark/70">
+                Generate 5 ideas based on trends and your creator profile.
+              </p>
+            </div>
             <button
               onClick={() => setOpenIdeas(true)}
-              className="mt-4 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
+              className="mt-4 self-start inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
+              type="button"
             >
               Open
             </button>
           </div>
 
           {/* Upload card */}
-          <div className="rounded-3xl border border-purple/10 bg-white/25 p-4 md:p-5 shadow-md shadow-purple/5">
-            <h2 className="text-base md:text-lg font-semibold text-dark flex items-center gap-2">
-              <span>🖼️</span> Upload & Caption
-            </h2>
-            <p className="mt-1 text-xs md:text-sm text-dark/70">
-              Upload an image or video and get a caption instantly.
-            </p>
+          <div className="rounded-3xl bg-white/40 backdrop-blur-xl border border-white/20 shadow-md p-5 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xl">🖼️</span>
+                <h2 className="text-sm md:text-base font-semibold text-dark">
+                  Upload & Caption
+                </h2>
+              </div>
+              <p className="text-xs md:text-sm text-dark/70">
+                Upload an image or video and get a caption instantly.
+              </p>
+            </div>
             <button
               onClick={() => setOpenUpload(true)}
-              className="mt-4 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
+              className="mt-4 self-start inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
+              type="button"
             >
               Open
             </button>
           </div>
 
           {/* Scheduler card */}
-          <div className="rounded-3xl border border-purple/10 bg-white/25 p-4 md:p-5 shadow-md shadow-purple/5">
-            <h2 className="text-base md:text-lg font-semibold text-dark flex items-center gap-2">
-              <span>📅</span> Scheduler
-            </h2>
-            <p className="mt-1 text-xs md:text-sm text-dark/70">
-              See best times for the next days and save slots for reminders.
-            </p>
+          <div className="rounded-3xl bg-white/40 backdrop-blur-xl border border-white/20 shadow-md p-5 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xl">📅</span>
+                <h2 className="text-sm md:text-base font-semibold text-dark">
+                  Scheduler
+                </h2>
+              </div>
+              <p className="text-xs md:text-sm text-dark/70">
+                See best times for the next days and save slots for reminders.
+              </p>
+            </div>
             <button
               onClick={() => setOpenScheduler(true)}
-              className="mt-4 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
+              className="mt-4 self-start inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
+              type="button"
             >
               Open
             </button>
           </div>
         </section>
 
-        {/* Recent drafts */}
-        <section className="mb-10">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-base md:text-lg font-semibold text-dark">
+        {/* drafts */}
+        <section className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm md:text-base font-semibold text-dark">
               Recent drafts
             </h2>
-            <a
-              href="/gallery"
-              className="text-xs md:text-sm font-medium text-purple hover:text-purple/80"
+            <Link
+              to="/gallery"
+              className="text-xs md:text-sm text-purple hover:text-pink transition-colors"
             >
               View all drafts →
-            </a>
+            </Link>
           </div>
-          <div className="rounded-3xl border border-purple/10 bg-white/90 p-4 md:p-5 shadow-sm shadow-purple/5">
+
+          <div className="rounded-3xl bg-white/95 backdrop-blur-xl border border-white/20 shadow-md px-4 py-4 md:px-6 md:py-5">
             {recentDrafts.length === 0 ? (
-              <p className="text-xs md:text-sm text-dark/60">
+              <p className="text-xs md:text-sm text-dark/95">
                 No drafts yet. Generate ideas or upload to start.
               </p>
             ) : (
-              <ul className="space-y-2 text-xs md:text-sm">
+              <ul className="space-y-2 text-xs md:text-sm text-dark/80">
                 {recentDrafts.map((d) => (
-                  <li
-                    key={d.id}
-                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 border-b last:border-b-0 border-purple/10 pb-2 last:pb-0"
-                  >
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-dark">
+                  <li key={d.id} className="flex items-center justify-between">
+                    <div>
+                      <span className="font-medium">
                         {d.title || "Untitled"}
                       </span>
                       {d.status && (
-                        <span className="text-[0.7rem] text-dark/50">
-                          {d.status}
+                        <span className="ml-1 text-dark/60">
+                          ({d.status})
                         </span>
                       )}
                     </div>
                     {d.created_at && (
-                      <span className="text-[0.75rem] text-dark/60">
+                      <span className="text-[0.7rem] text-dark/55">
                         {new Date(d.created_at).toLocaleString()}
                       </span>
                     )}
@@ -428,13 +435,15 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* Reviews */}
-        <ReviewsSection />
+        {/* reviews widget */}
+        <section className="mt-6">
+          <ReviewsSection />
+        </section>
       </div>
 
       {/* MODALS */}
 
-      {/* Ideas modal */}
+      {/* Ideas */}
       <Modal
         open={openIdeas}
         onClose={() => setOpenIdeas(false)}
@@ -443,34 +452,39 @@ export default function Dashboard() {
         <button
           onClick={handleGenerateIdeas}
           disabled={ideasLoading}
-          className="rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+          className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 disabled:opacity-60 disabled:hover:translate-y-0 hover:translate-y-[-1px] active:translate-y-0 transition-all"
+          type="button"
         >
           {ideasLoading ? "Generating..." : "Generate 5 ideas"}
         </button>
+
         <div className="mt-4 space-y-3">
           {ideas.length === 0 && !ideasLoading && (
-            <p className="text-xs md:text-sm text-dark/60">
+            <p className="text-xs md:text-sm text-dark/70">
               No ideas yet. Click the button above.
             </p>
           )}
           {ideas.map((idea, idx) => (
             <div
               key={idx}
-              className="rounded-2xl border border-purple/10 bg-purple/3 p-3 text-xs md:text-sm"
+              className="rounded-2xl border border-purple/10 bg-purple/5 px-3 py-3 text-xs md:text-sm"
             >
-              <h3 className="m-0 mb-1 text-sm font-semibold text-dark">
+              <h3 className="font-semibold text-dark mb-1">
                 {idea.title || "Idea"}
               </h3>
-              <p className="text-dark/80">{idea.description}</p>
+              {idea.description && (
+                <p className="text-dark/75 mb-1">{idea.description}</p>
+              )}
               {idea.suggested_caption_starter && (
-                <p className="mt-1">
-                  <strong>Caption start:</strong>{" "}
+                <p className="text-[0.75rem] text-dark/70">
+                  <span className="font-semibold">Caption start:</span>{" "}
                   {idea.suggested_caption_starter}
                 </p>
               )}
               {idea.personal_twist && (
-                <p className="mt-1">
-                  <strong>Twist:</strong> {idea.personal_twist}
+                <p className="text-[0.75rem] text-dark/70">
+                  <span className="font-semibold">Twist:</span>{" "}
+                  {idea.personal_twist}
                 </p>
               )}
             </div>
@@ -478,7 +492,7 @@ export default function Dashboard() {
         </div>
       </Modal>
 
-      {/* Upload modal */}
+      {/* Upload */}
       <Modal
         open={openUpload}
         onClose={() => setOpenUpload(false)}
@@ -486,98 +500,113 @@ export default function Dashboard() {
       >
         <form
           onSubmit={handleUpload}
-          className="flex flex-wrap items-center gap-2 text-xs md:text-sm"
+          className="flex flex-col md:flex-row gap-3 items-start md:items-center"
         >
           <input
             type="file"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
-            className="text-xs"
+            className="text-xs md:text-sm"
           />
           <button
             type="submit"
-            className="rounded-2xl bg-purple px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-purple/90"
+            className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
           >
             Upload
           </button>
         </form>
+
         {uploadStatus && (
-          <p className="mt-2 text-xs md:text-sm text-dark/70">
-            {uploadStatus}
-          </p>
+          <p className="mt-2 text-xs md:text-sm text-dark/75">{uploadStatus}</p>
         )}
+
         {uploadId && (
           <div className="mt-3">
             <button
               onClick={handleGenerateCaption}
-              className="rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
+              className="inline-flex items-center justify-center rounded-2xl bg-purple/10 px-4 py-2 text-xs md:text-sm font-semibold text-purple hover:bg-purple/20 transition-all"
+              type="button"
             >
               Generate caption
             </button>
           </div>
         )}
+
         {caption && (
           <div className="mt-3">
-            <h3 className="text-sm font-semibold text-dark">Caption</h3>
+            <h3 className="text-sm font-semibold mb-1 text-dark">Caption</h3>
             <textarea
               value={caption}
               readOnly
               rows={4}
-              className="mt-1 w-full rounded-2xl border border-purple/20 bg-white/25 p-2 text-xs md:text-sm"
+              className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2 text-xs md:text-sm text-dark/80"
             />
           </div>
         )}
       </Modal>
 
-      {/* Scheduler modal */}
+      {/* Scheduler */}
       <Modal
         open={openScheduler}
         onClose={() => setOpenScheduler(false)}
         title="Best times to post"
       >
         {schedulerLoading && (
-          <p className="text-xs md:text-sm text-dark/70">Loading...</p>
+          <p className="text-xs md:text-sm text-dark/75">Loading...</p>
         )}
-        {!schedulerLoading &&
-          suggestions.map((day: any) => (
-            <div key={day.date} className="mb-4 text-xs md:text-sm">
-              <h4 className="mb-1 font-semibold text-dark">{day.date}</h4>
-              {day.slots.length === 0 && (
-                <p className="text-dark/60">No suggestions.</p>
-              )}
-              <ul className="space-y-1">
-                {day.slots.map((slot: any) => (
-                  <li key={slot.datetime}>
-                    {slot.time} – {slot.platform} (score{" "}
-                    {slot.engagement_score})
-                    {slot.saved ? (
-                      <span className="ml-2 text-emerald-600">✅ saved</span>
-                    ) : (
-                      <button
-                        className="ml-2 rounded-xl bg-purple/10 px-2 py-[2px] text-[0.7rem] font-semibold text-purple hover:bg-purple/20"
-                        onClick={() => handleSaveSlot(slot)}
-                      >
-                        Save
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
 
-        <h3 className="mt-4 mb-1 text-sm font-semibold text-dark">
-          My planned slots
-        </h3>
-        {mySlots.length === 0 && (
-          <p className="text-xs md:text-sm text-dark/60">None yet.</p>
+        {!schedulerLoading && (
+          <div className="space-y-4">
+            {suggestions.map((day: any) => (
+              <div key={day.date} className="border-b border-purple/10 pb-3">
+                <h4 className="text-xs md:text-sm font-semibold text-dark mb-1">
+                  {day.date}
+                </h4>
+                {day.slots.length === 0 && (
+                  <p className="text-[0.8rem] text-dark/65">
+                    No suggestions for this day.
+                  </p>
+                )}
+                <ul className="space-y-1 text-[0.8rem] text-dark/80">
+                  {day.slots.map((slot: any) => (
+                    <li key={slot.datetime}>
+                      {slot.time} – {slot.platform} (score{" "}
+                      {slot.engagement_score})
+                      {slot.saved ? (
+                        <span className="ml-2 text-green-600">✅ saved</span>
+                      ) : (
+                        <button
+                          className="ml-2 rounded-full bg-purple/10 px-2 py-0.5 text-[0.7rem] font-semibold text-purple hover:bg-purple/20 transition-all"
+                          type="button"
+                          onClick={() => handleSaveSlot(slot)}
+                        >
+                          Save
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+
+            <div className="mt-2">
+              <h3 className="text-xs md:text-sm font-semibold text-dark mb-1">
+                My planned slots
+              </h3>
+              {mySlots.length === 0 ? (
+                <p className="text-[0.8rem] text-dark/65">None yet.</p>
+              ) : (
+                <ul className="space-y-1 text-[0.8rem] text-dark/80">
+                  {mySlots.map((s: any) => (
+                    <li key={s.id}>
+                      {s.platform} – {s.scheduled_at}{" "}
+                      {s.notify ? "🔔" : ""}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
         )}
-        <ul className="space-y-1 text-xs md:text-sm">
-          {mySlots.map((s: any) => (
-            <li key={s.id}>
-              {s.platform} – {s.scheduled_at} {s.notify ? "🔔" : ""}
-            </li>
-          ))}
-        </ul>
       </Modal>
     </div>
   );

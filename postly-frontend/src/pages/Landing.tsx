@@ -231,7 +231,7 @@ export default function Landing() {
             <div className="mt-8 grid gap-12 md:grid-cols-[1.2fr,1fr] items-center">
               {/* LEFT COLUMN WITH BLOBS */}
               <div className="relative">
-                {/* Yellow blob behind top-left of text */}
+                {/* pink blob behind top-left of text */}
                 <div
                   className="hidden md:block"
                   style={{
@@ -246,7 +246,7 @@ export default function Landing() {
                   }}
                 />
 
-                {/* Teal blob behind bottom-right of text */}
+                {/* purple blob behind bottom-right of text */}
                 <div
                   className="hidden md:block"
                   style={{
@@ -256,7 +256,7 @@ export default function Landing() {
                     width: 240,
                     height: 240,
                     borderRadius: "999px",
-                    background: "rgba(69, 1, 255, 0.5)", // teal
+                    background: "rgba(69, 1, 255, 0.5)", // purple
                     filter: "blur(40px)",
                   }}
                 />

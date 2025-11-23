@@ -75,7 +75,7 @@ const ReviewsSection: React.FC = () => {
   }
 
   return (
-    <section className="mt-10 bg-white/95 backdrop-blur rounded-3xl shadow-xl border border-purple/10 px-5 py-6 md:px-7 md:py-7">
+    <section className="mt-10 bg-white/40 backdrop-blur rounded-3xl shadow-xl border border-purple/10 px-5 py-6 md:px-7 md:py-7">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-5">
         <div>
           <h2 className="text-base md:text-lg font-semibold text-dark mb-1">
