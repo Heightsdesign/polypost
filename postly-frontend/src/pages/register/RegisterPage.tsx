@@ -27,22 +27,21 @@ const RegisterPage: React.FC = () => {
     setStep((s) => Math.max(1, s - 1));
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (extraData?: any) => {
     setSubmitting(true);
     setSuccessMessage("");
     setErrorMessage("");
 
+    // merge step 4 data into the full payload
+    const payload = extraData ? { ...formData, ...extraData } : formData;
+
     try {
-      await api.post("/auth/register/", formData);
+      await api.post("/auth/register/", payload);
 
       setSuccessMessage(
         "🎉 Your account has been created! Please check your inbox to confirm your email before logging in."
       );
       setErrorMessage("");
-
-      // optional: reset flow
-      // setStep(1);
-      // setFormData({});
     } catch (err: any) {
       console.error(err);
       setErrorMessage(
@@ -53,6 +52,7 @@ const RegisterPage: React.FC = () => {
       setSubmitting(false);
     }
   };
+
 
   const steps = [
     <StepAccount key="step-1" onNext={handleNext} />,

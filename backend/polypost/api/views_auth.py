@@ -5,6 +5,7 @@ from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.core.mail import send_mail
 from django.conf import settings
+from django.contrib.auth import update_session_auth_hash
 
 from django.contrib.auth.tokens import default_token_generator
 
@@ -17,6 +18,7 @@ from .auth_serializers import PostlyTokenObtainPairSerializer
 from .serializers_password import (
     PasswordResetRequestSerializer,
     PasswordResetConfirmSerializer,
+    ChangePasswordSerializer,
 )
 
 token_generator = PasswordResetTokenGenerator()
@@ -118,3 +120,31 @@ class EmailConfirmView(APIView):
         user.save()
 
         return Response({"detail": "Email confirmed. You can now log in."}, status=200)
+    
+
+class ChangePasswordView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        serializer = ChangePasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        old_password = serializer.validated_data["old_password"]
+        new_password = serializer.validated_data["new_password"]
+
+        if not user.check_password(old_password):
+            return Response(
+                {"detail": "Your current password is incorrect."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.set_password(new_password)
+        user.save()
+        # keep user logged in after password change
+        update_session_auth_hash(request, user)
+
+        return Response(
+            {"detail": "Password updated successfully."},
+            status=status.HTTP_200_OK,
+        )

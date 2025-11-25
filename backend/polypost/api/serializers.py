@@ -25,6 +25,7 @@ class RegisterSerializer(serializers.Serializer):
     phone = serializers.CharField(required=False, allow_blank=True)
     content_languages = serializers.CharField(required=False, allow_blank=True)
     marketing_opt_in = serializers.BooleanField(required=False, default=False)
+    notifications_enabled = serializers.BooleanField(required=False, default=False)
     creator_stage = serializers.CharField(required=False, allow_blank=True)
 
     def validate_username(self, value):
@@ -74,6 +75,9 @@ class CreatorProfileSerializer(serializers.ModelSerializer):
             "always_add_emojis",
             "always_add_cta",
             "default_platform",
+            "notifications_enabled",
+            "marketing_opt_in",
+            "creator_stage",
             "avatar",
         )
         read_only_fields = ("id", "username", "email")

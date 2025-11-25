@@ -5,6 +5,26 @@ import os
 import requests
 
 from .models import MonthlyUsage, Subscription, Plan
+from django.core.mail import EmailMultiAlternatives
+from django.utils.timezone import now
+from .email_templates import POSTLY_EMAIL_TEMPLATE
+
+def send_postly_email(to, title, message, button_text, button_url):
+    html = (POSTLY_EMAIL_TEMPLATE
+            .replace("{{TITLE}}", title)
+            .replace("{{MESSAGE}}", message)
+            .replace("{{BUTTON_TEXT}}", button_text)
+            .replace("{{BUTTON_URL}}", button_url)
+            .replace("{{YEAR}}", str(now().year)))
+
+    email = EmailMultiAlternatives(
+        subject=title,
+        body=message,  # fallback text
+        from_email="Postly <no-reply@polypost-platform.com>",
+        to=[to],
+    )
+    email.attach_alternative(html, "text/html")
+    email.send()
 
 
 
@@ -211,6 +231,7 @@ def get_user_plan(user):
     # no sub → fallback to free
     return get_or_create_free_plan()
 
+
 def get_current_usage(user):
     today = date.today()
     usage, _ = MonthlyUsage.objects.get_or_create(
@@ -221,32 +242,40 @@ def get_current_usage(user):
     )
     return usage
 
-def check_usage_allowed(user, kind: str) -> bool:
+
+def check_usage_allowed(user, kind: str, amount: int = 1) -> bool:
     """
     kind = "idea" or "caption"
+    amount = how many units we want to consume (e.g. 5 ideas per generation)
     """
     plan = get_user_plan(user)          # never None now
     usage = get_current_usage(user)
 
     if kind == "idea":
-        # None or 0 in plan should mean "no ideas", but let's be safe
         limit = plan.ideas_per_month or 0
-        return usage.ideas_used < limit
+        # allow only if after this call we are still <= limit
+        return usage.ideas_used + amount <= limit
+
     elif kind == "caption":
         limit = plan.captions_per_month or 0
-        return usage.captions_used < limit
+        return usage.captions_used + amount <= limit
 
     # unknown kind → block
     return False
 
-def increment_usage(user, kind: str):
+
+def increment_usage(user, kind: str, amount: int = 1):
+    """
+    Increment usage counters by given amount.
+    """
+    # plan not strictly needed here but you might want it later
     plan = get_user_plan(user)
     usage = get_current_usage(user)
 
     if kind == "idea":
-        usage.ideas_used += 1
+        usage.ideas_used += amount
     elif kind == "caption":
-        usage.captions_used += 1
+        usage.captions_used += amount
 
     usage.save()
 
@@ -258,4 +287,4 @@ def user_has_active_subscription(user):
         sub = user.subscription  # OneToOne
     except Subscription.DoesNotExist:
         return False
-    return sub.is_active
+    return sub.is_active()

@@ -75,7 +75,7 @@ const ResetPasswordPage: React.FC = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-60"
+            className="w-full bg-gradient-to-r from-purple to-pink text-white py-2 rounded-lg shadow-md shadow-purple/25 hover:shadow-purple/40 transition-all disabled:opacity-60"
           >
             {loading ? "Resetting..." : "Set New Password"}
           </button>

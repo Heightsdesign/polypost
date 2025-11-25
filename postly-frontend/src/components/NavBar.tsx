@@ -201,7 +201,7 @@ export default function Navbar() {
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="w-full text-left px-3 py-2 text-[0.78rem] md:text-xs text-red-500 hover:bg-red-50"
+                    className="w-full text-left px-3 py-2 text-[0.78rem] md:text-xs text-white-500 hover:bg-purple-90"
                   >
                     Log out
                   </button>

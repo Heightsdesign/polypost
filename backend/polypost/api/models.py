@@ -52,6 +52,7 @@ class CreatorProfile(models.Model):
             ("twitter", "Twitter/X"),
             ("onlyfans", "OnlyFans"),
             ("mym", "MYM Fans"),
+            ("snapchat", "Snapchat"),
             ("general", "General"),
             ("entertainment", "Entertainment"),
             ],
@@ -94,6 +95,7 @@ class CreatorProfile(models.Model):
 
     onboarding_completed = models.BooleanField(default=False)
     marketing_opt_in = models.BooleanField(default=False)
+    notifications_enabled = models.BooleanField(default=False)
 
     CREATOR_STAGES = [
         ("starter", "Starter"),

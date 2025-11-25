@@ -7,7 +7,7 @@ from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
 from celery.schedules import crontab
-
+import django_ses
 # -----------------------------------------------------------------------------
 # PATHS
 # -----------------------------------------------------------------------------
@@ -181,3 +181,16 @@ if DEBUG:
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_FRONTEND_URL = os.getenv("STRIPE_FRONTEND_URL", "http://localhost:5173")
+
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django_ses.SESBackend")
+
+AWS_SES_REGION_NAME = os.getenv("AWS_SES_REGION_NAME", "eu-west-1")
+AWS_SES_REGION_ENDPOINT = os.getenv(
+    "AWS_SES_REGION_ENDPOINT",
+    "email.eu-west-1.amazonaws.com"
+)
+
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Polypost <polypost-management@polypost-platform.com>")

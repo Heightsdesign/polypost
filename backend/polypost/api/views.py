@@ -9,13 +9,13 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
 
 from django.conf import settings
-
+from django.utils import timezone as dj_timezone
 from .models import (
     MediaUpload, GeneratedCaption, CreatorProfile, 
     GlobalTrend, PlannedPostSlot, UseCaseTemplate,
     PlatformTiming, PostPerformance, Plan, 
     Subscription, Draft, MediaUpload, GeneratedCaption,
-    
+    MonthlyUsage
     )
 
 from .serializers import (
@@ -26,7 +26,7 @@ from .serializers import (
 
 from .utils import (
     build_caption_prompt, get_seasonal_hooks, get_floating_event_hooks,
-    get_trending_stub_hooks, get_trending_topics, get_trending_movies_from_tmdb
+    get_trending_stub_hooks, get_trending_topics, get_trending_movies_from_tmdb, get_user_plan
     )
 
 from .utils import check_usage_allowed, increment_usage
@@ -87,7 +87,7 @@ class RegisterView(views.APIView):
             message,
             getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@postly.local"),
             [user.email],
-            fail_silently=True,   # avoids dev crashes if email backend not configured
+            fail_silently=False,   # avoids dev crashes if email backend not configured
         )
 
         return Response(
@@ -100,12 +100,13 @@ class RegisterView(views.APIView):
     
     
 class MeProfileView(generics.RetrieveUpdateAPIView):
-    """
-    Get or update the current user's creator profile (including avatar).
-    """
     serializer_class = CreatorProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
-    parser_classes = [parsers.MultiPartParser, parsers.FormParser]
+    parser_classes = [
+        parsers.JSONParser,          # 👈 REQUIRED for JSON body
+        parsers.MultiPartParser,
+        parsers.FormParser,
+    ]
 
     def get_object(self):
         return CreatorProfile.objects.get(user=self.request.user)
@@ -132,6 +133,13 @@ class GenerateCaptionView(views.APIView):
         serializer.is_valid(raise_exception=True)
         media = serializer.validated_data["media"]
 
+        CAPTIONS_PER_CALL = 1
+        if not check_usage_allowed(request.user, "caption", amount=CAPTIONS_PER_CALL):
+            return Response(
+                {"detail": "Caption limit reached for your plan. Upgrade to Pro."},
+                status=403,
+            )
+
         platform = request.data.get("platform", "instagram")
 
         profile = CreatorProfile.objects.filter(user=request.user).first()
@@ -151,6 +159,8 @@ class GenerateCaptionView(views.APIView):
             media=media,
             defaults={"text": caption_text, "is_user_edited": False},
         )
+        # after successful generation:
+        increment_usage(request.user, "caption", amount=CAPTIONS_PER_CALL)
         return Response(GeneratedCaptionSerializer(caption_obj).data, status=status.HTTP_201_CREATED)
     
 
@@ -160,6 +170,8 @@ class GenerateIdeasView(views.APIView):
     def post(self, request, *args, **kwargs):
         user = request.user
         profile = CreatorProfile.objects.filter(user=user).first()
+
+        IDEAS_PER_CALL = 5
 
         # ---------------------------------------------------------------------
         # 1. Plan usage check
@@ -268,7 +280,7 @@ class GenerateIdeasView(views.APIView):
         except Exception:
             pass  # If model returns text instead of JSON, fallback to raw
 
-        increment_usage(user, "idea")
+        increment_usage(user, "idea", amount=IDEAS_PER_CALL)
         return Response({"ideas": ideas}, status=status.HTTP_200_OK)
     
     
@@ -804,3 +816,31 @@ class StripeWebhookView(views.APIView):
             subscription_obj.save()
 
         return Response(status=200)
+    
+
+class UsageSummaryView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        now = dj_timezone.now()
+
+        usage, _ = MonthlyUsage.objects.get_or_create(
+            user=user,
+            year=now.year,
+            month=now.month,
+            defaults={"ideas_used": 0, "captions_used": 0},
+        )
+
+        plan = get_user_plan(user)  # 👈 this will fallback to free plan
+
+        ideas_limit = plan.ideas_per_month or 0
+        captions_limit = plan.captions_per_month or 0
+
+        data = {
+            "ideas_used": usage.ideas_used,
+            "ideas_limit": ideas_limit,
+            "captions_used": usage.captions_used,
+            "captions_limit": captions_limit,
+        }
+        return Response(data, status=status.HTTP_200_OK)

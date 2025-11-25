@@ -4,6 +4,7 @@ import React, { useState } from "react";
 type StepExtrasProps = {
   onSubmit: (data: {
     marketing_opt_in: boolean;
+    notifications_enabled: boolean;
     creator_stage: string;
   }) => void;
   onBack: (data?: any) => void;
@@ -19,6 +20,7 @@ const STAGES = [
 const StepExtras: React.FC<StepExtrasProps> = ({ onSubmit, onBack, submitting }) => {
   const [data, setData] = useState({
     marketing_opt_in: true,
+    notifications_enabled: true,
     creator_stage: "starter",
   });
 
@@ -92,6 +94,32 @@ const StepExtras: React.FC<StepExtrasProps> = ({ onSubmit, onBack, submitting })
             No spam. You can opt out anytime with one click.
           </p>
         </div>
+        {/* notifications opt in */}
+        <div>
+          <label className="block text-xs font-semibold text-dark/70 mb-2">
+            Enable notifications?
+          </label>
+          <label className="flex items-center gap-2 text-xs md:text-sm text-dark/75">
+            <input
+              type="checkbox"
+              checked={data.notifications_enabled}
+              onChange={(e) =>
+                setData((prev) => ({
+                  ...prev,
+                  notifications_enabled: e.target.checked,
+                }))
+              }
+              className="h-4 w-4 rounded border-purple/40 text-purple focus:ring-purple"
+            />
+            <span>
+              Yes, send me reminders for my scheduled posts & content ideas.
+            </span>
+          </label>
+          <p className="mt-1 text-[11px] text-dark/55">
+            You can turn this off anytime in account settings.
+          </p>
+        </div>
+
 
         <div className="mt-6 flex gap-3">
           <button

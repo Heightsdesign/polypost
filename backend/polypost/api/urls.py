@@ -11,16 +11,15 @@ from .views import (
     SchedulerSuggestionsView, AnalyticsIngestView, StripeCheckoutSessionView,
     StripeWebhookView, MySubscriptionView, DraftListCreateView,
     DraftPinView, DraftArchiveView, UseCaseTemplateListView,
-    ApplyUseCaseTemplateView, MeProfileView, 
+    ApplyUseCaseTemplateView, MeProfileView, UsageSummaryView
     )
-from .views_auth import PasswordResetRequestView, PasswordResetConfirmView, LoginView, EmailConfirmView
+from .views_auth import PasswordResetRequestView, PasswordResetConfirmView, LoginView, EmailConfirmView, ChangePasswordView
 
 from .views_feedback import (
     SupportTicketCreateView,
     AppReviewListCreateView,
     AppReviewFeaturedListView,
 )
-
 
 
 router = DefaultRouter()
@@ -42,8 +41,11 @@ urlpatterns = [
     path("drafts/", DraftListCreateView.as_view(), name="draft-list-create"),
     path("drafts/<uuid:pk>/pin/", DraftPinView.as_view(), name="draft-pin"),
     path("drafts/<uuid:pk>/archive/", DraftArchiveView.as_view(), name="draft-archive"),
+
     path("auth/password-reset/", PasswordResetRequestView.as_view(), name="password-reset"),
     path("auth/password-reset/confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
+    path("auth/change-password/", ChangePasswordView.as_view(), name="change-password"),
+    
     path("auth/login/", LoginView.as_view(), name="token_obtain_pair"),
     path("use-cases/", UseCaseTemplateListView.as_view(), name="use-case-templates"),
     path("use-cases/apply/", ApplyUseCaseTemplateView.as_view(), name="use-case-apply"),
@@ -56,5 +58,7 @@ urlpatterns = [
     # Reviews & ratings
     path("reviews/", AppReviewListCreateView.as_view(), name="reviews-list-create"),
     path("reviews/featured/", AppReviewFeaturedListView.as_view(), name="reviews-featured"),
+
+    path("usage/summary/", UsageSummaryView.as_view(), name="usage-summary"),
 
 ] + router.urls

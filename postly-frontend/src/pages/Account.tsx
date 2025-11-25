@@ -56,6 +56,17 @@ export default function Account() {
         setTargetAudience(d.target_audience || "");
         setDefaultPlatform(d.default_platform || "instagram");
         setTimezone(d.timezone || "UTC");
+        // NEW: map backend booleans -> toggles
+        setNotifyEmail(
+          typeof d.notifications_enabled === "boolean"
+            ? d.notifications_enabled
+            : true
+        );
+        setNotifyPush(
+          typeof d.marketing_opt_in === "boolean"
+            ? d.marketing_opt_in
+            : false
+        );
       } catch (err) {
         setError("Could not load preferences.");
       } finally {
@@ -118,13 +129,15 @@ export default function Account() {
     setError("");
     setSuccess(false);
     try {
-      await api.put("/profile/me/", {
+      await api.put("/auth/me/profile/", {
         vibe,
         tone,
         niche,
         target_audience: targetAudience,
         default_platform: defaultPlatform,
         timezone,
+        notifications_enabled: notifyEmail,
+        marketing_opt_in: notifyPush,
       });
       setSuccess(true);
     } catch (err) {
@@ -133,6 +146,24 @@ export default function Account() {
       setSavingPrefs(false);
     }
   }
+
+  async function handleSaveNotifications() {
+    setSavingPrefs(true);
+    setError("");
+    setSuccess(false);
+    try {
+      await api.put("/auth/me/profile/", {
+        notifications_enabled: notifyEmail,
+        marketing_opt_in: notifyPush,
+      });
+      setSuccess(true);
+    } catch (err) {
+      setError("Could not save notification preferences.");
+    } finally {
+      setSavingPrefs(false);
+    }
+  }
+
 
   // start stripe checkout
   async function handleUpgrade() {
@@ -153,7 +184,6 @@ export default function Account() {
       setCheckoutLoading(false);
     }
   }
-
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
     setPwMsg("");
@@ -165,10 +195,20 @@ export default function Account() {
       setPwMsg("Password updated ✅");
       setOldPassword("");
       setNewPassword("");
-    } catch (err) {
-      setPwMsg("Could not change password (endpoint not implemented yet).");
+    } catch (err: any) {
+      const data = err.response?.data;
+      if (data) {
+        const msgs: string[] = [];
+        if (data.detail) msgs.push(data.detail);
+        if (data.old_password) msgs.push(...data.old_password);
+        if (data.new_password) msgs.push(...data.new_password);
+        setPwMsg(msgs.join(" "));
+      } else {
+        setPwMsg("Could not change password. Please try again.");
+      }
     }
   }
+
 
   function handleLogout() {
     localStorage.removeItem("postly_token");
@@ -373,7 +413,10 @@ export default function Account() {
                 <option value="instagram">Instagram</option>
                 <option value="tiktok">TikTok</option>
                 <option value="twitter">X / Twitter</option>
+                <option value="snapchat">Snapchat</option>
                 <option value="onlyfans">OnlyFans</option>
+                <option value="mym">MYM Fans</option>
+                
               </select>
             </div>
             <div style={fieldStyle}>
@@ -388,27 +431,52 @@ export default function Account() {
         )}
       </section>
 
-      {/* Notifications */}
+       {/* Notifications */}
       <section style={sectionStyle}>
         <h2>Notifications</h2>
-        <p style={{ color: "#666" }}>Choose how you want to be reminded to post.</p>
-        <label>
-          <input
-            type="checkbox"
-            checked={notifyEmail}
-            onChange={(e) => setNotifyEmail(e.target.checked)}
-          />{" "}
-          Email reminders
-        </label>
-        <br />
-        <label>
-          <input
-            type="checkbox"
-            checked={notifyPush}
-            onChange={(e) => setNotifyPush(e.target.checked)}
-          />{" "}
-          Push / browser notifications
-        </label>
+        <p style={{ color: "#666", marginBottom: "0.75rem" }}>
+          Choose what you want to receive from Postly.
+        </p>
+
+        <div style={{ marginBottom: "0.5rem" }}>
+          <label>
+            <input
+              type="checkbox"
+              checked={notifyEmail}
+              onChange={(e) => setNotifyEmail(e.target.checked)}
+            />{" "}
+            Content reminders (email / future push)
+          </label>
+        </div>
+
+        <div style={{ marginBottom: "0.75rem" }}>
+          <label>
+            <input
+              type="checkbox"
+              checked={notifyPush}
+              onChange={(e) => setNotifyPush(e.target.checked)}
+            />{" "}
+            Newsletter & product updates
+          </label>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleSaveNotifications}
+          style={{
+            marginTop: "0.25rem",
+            padding: "0.45rem 0.9rem",
+            borderRadius: 10,
+            border: "1px solid #d0c3ff",
+            background: "#f7f4ff",
+            fontSize: "0.85rem",
+            fontWeight: 600,
+            color: "#5b4bdb",
+            cursor: "pointer",
+          }}
+        >
+          Save notification preferences
+        </button>
       </section>
 
       {/* Connected accounts */}
@@ -427,31 +495,83 @@ export default function Account() {
 
       {/* Security */}
       <section style={sectionStyle}>
-        <h2>Security</h2>
-        <form onSubmit={handleChangePassword}>
-          <div style={fieldStyle}>
-            <label>Current password</label>
+        <h2 style={{ marginBottom: "0.5rem" }}>Security</h2>
+        <p style={{ color: "#666", fontSize: "0.85rem", marginBottom: "0.75rem" }}>
+          Change your password. You’ll stay logged in on this device.
+        </p>
+
+        <form onSubmit={handleChangePassword} style={{ maxWidth: 380 }}>
+          <div style={{ marginBottom: "0.75rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.8rem",
+                fontWeight: 600,
+                color: "#444",
+                marginBottom: "0.25rem",
+              }}
+            >
+              Current password
+            </label>
             <input
               type="password"
               value={oldPassword}
               onChange={(e) => setOldPassword(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.7rem",
+                borderRadius: 10,
+                border: "1px solid #e0ddff",
+                fontSize: "0.85rem",
+                outline: "none",
+              }}
             />
           </div>
-          <div style={fieldStyle}>
-            <label>New password</label>
+
+          <div style={{ marginBottom: "0.75rem" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.8rem",
+                fontWeight: 600,
+                color: "#444",
+                marginBottom: "0.25rem",
+              }}
+            >
+              New password
+            </label>
             <input
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "0.5rem 0.7rem",
+                borderRadius: 10,
+                border: "1px solid #e0ddff",
+                fontSize: "0.85rem",
+                outline: "none",
+              }}
             />
           </div>
-          <button type="submit">Change password</button>
+
+          <button
+            type="submit"
+            className="bg-purple text-white px-4 py-2 rounded-xl shadow-md shadow-purple/25 text-sm font-semibold hover:shadow-purple/40 transition-all"
+          >
+            Change password
+          </button>
         </form>
-        {pwMsg && <p style={{ marginTop: "0.5rem" }}>{pwMsg}</p>}
+
+        {pwMsg && (
+          <p style={{ marginTop: "0.75rem", fontSize: "0.85rem", color: "#444" }}>
+            {pwMsg}
+          </p>
+        )}
 
         <hr style={{ margin: "1.5rem 0" }} />
 
-        <button onClick={handleLogout} style={{ background: "#eee" }}>
+        <button onClick={handleLogout} style={{ background: "#eee", padding: "0.5rem 0.9rem", borderRadius: 8 }}>
           Logout
         </button>
       </section>

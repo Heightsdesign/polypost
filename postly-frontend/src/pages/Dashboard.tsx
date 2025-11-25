@@ -50,6 +50,13 @@ function Modal({
   );
 }
 
+type UsageSummary = {
+  ideas_used: number;
+  ideas_limit: number;
+  captions_used: number;
+  captions_limit: number;
+};
+
 export default function Dashboard() {
   // modals
   const [openIdeas, setOpenIdeas] = useState(false);
@@ -74,8 +81,13 @@ export default function Dashboard() {
   const [mySlots, setMySlots] = useState<any[]>([]);
   const [schedulerLoading, setSchedulerLoading] = useState(false);
 
+  const [mediaDraftTitle, setMediaDraftTitle] = useState("");
+
   // drafts
   const [recentDrafts, setRecentDrafts] = useState<any[]>([]);
+
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
+
 
   async function refreshRecentDrafts() {
     try {
@@ -86,8 +98,19 @@ export default function Dashboard() {
     }
   }
 
+  async function fetchUsageSummary() {
+    try {
+      const res = await api.get("/usage/summary/");
+      setUsage(res.data);
+    } catch (e) {
+      console.warn("Could not load usage summary", e);
+      setUsage(null);
+    }
+  }
+
   useEffect(() => {
     refreshRecentDrafts();
+    fetchUsageSummary();
   }, []);
 
   // load scheduler when modal opens
@@ -111,7 +134,6 @@ export default function Dashboard() {
   }, [openScheduler]);
 
   // ----- handlers -----
-
   async function handleGenerateIdeas() {
     setIdeasLoading(true);
     try {
@@ -125,6 +147,9 @@ export default function Dashboard() {
         }
       }
       setIdeas(data || []);
+
+      // NEW: refresh usage so the count updates on the dashboard
+      fetchUsageSummary();
     } catch (e) {
       console.warn(e);
     } finally {
@@ -197,15 +222,22 @@ export default function Dashboard() {
       return;
     }
 
+    if (!mediaDraftTitle.trim()) {
+      setUploadStatus("Please add a title before saving this draft.");
+      return;
+    }
+
     try {
       setSavingMediaDraft(true);
       await api.post("/drafts/", {
-        draft_type: "media",
+        draft_type: "media",            // 👈 important
         media: uploadId,
-        caption: (captionObj as any).id,
+        caption: captionObj.id,
+        title: mediaDraftTitle.trim(),  // 👈 THIS is what must go through
       });
       await refreshRecentDrafts();
       setUploadStatus("Media draft saved ✅");
+      setMediaDraftTitle("");
     } catch (e) {
       console.warn(e);
       setUploadStatus("Failed to save draft.");
@@ -213,7 +245,6 @@ export default function Dashboard() {
       setSavingMediaDraft(false);
     }
   }
-
   async function handleSaveSlot(slot: any) {
     try {
       await api.post("/scheduler/plan/", {
@@ -443,7 +474,9 @@ export default function Dashboard() {
                   <p className="text-[0.7rem] uppercase tracking-wide text-dark/60 mb-1">
                     Ideas generated
                   </p>
-                  <p className="text-lg font-semibold text-purple">—</p>
+                  <p className="text-lg font-semibold text-purple">
+                    {usage ? `${usage.ideas_used} / ${usage.ideas_limit || 0}` : "—"}
+                  </p>
                 </div>
                 <div className="rounded-2xl bg-pink/5 border border-pink/10 px-3 py-3">
                   <p className="text-[0.7rem] uppercase tracking-wide text-dark/60 mb-1">
@@ -632,6 +665,19 @@ export default function Dashboard() {
                   readOnly
                   rows={4}
                   className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2 text-xs md:text-sm text-dark/80"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[0.75rem] font-semibold text-dark mb-1">
+                  Draft title
+                </label>
+                <input
+                  type="text"
+                  value={mediaDraftTitle}
+                  onChange={(e) => setMediaDraftTitle(e.target.value)}
+                  className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2 text-xs md:text-sm text-dark/80"
+                  placeholder="e.g. Gym selfie before/after, Beach reel, Q&A story"
                 />
               </div>
 
