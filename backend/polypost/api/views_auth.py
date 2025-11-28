@@ -13,7 +13,7 @@ from rest_framework import status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
-from .auth_serializers import PostlyTokenObtainPairSerializer
+from .auth_serializers import PostlyTokenObtainPairSerializer, NewsletterSendSerializer
 
 from .serializers_password import (
     PasswordResetRequestSerializer,
@@ -21,7 +21,12 @@ from .serializers_password import (
     ChangePasswordSerializer,
 )
 
+from .utils import send_postly_email
+from .tasks import send_login_alert_email, send_newsletter_email_task
+
+
 token_generator = PasswordResetTokenGenerator()
+
 
 class PasswordResetRequestView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -41,26 +46,28 @@ class PasswordResetRequestView(APIView):
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = token_generator.make_token(user)
 
-        # Link for the frontend page that will handle the reset (your page will read uid/token from query params)
         frontend_base = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
         reset_url = f"{frontend_base}/reset-password?uid={uid}&token={token}"
 
-        subject = "Polypost — Reset your password"
+        subject = "Reset your Postly password"
         message = (
-            "You requested a password reset for your Polypost account.\n\n"
-            f"Click the link below to set a new password:\n\n{reset_url}\n\n"
-            "If you didn’t request this, you can ignore this email."
+            "You requested a password reset for your Postly account.\n\n"
+            "Click the button below to set a new password.\n\n"
+            "If you didn’t request this, you can safely ignore this email."
         )
 
-        send_mail(
-            subject,
-            message,
-            getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@polypost.local"),
-            [email],
-            fail_silently=True,  # in dev we don't want to blow up the request
+        # Branded HTML email
+        send_postly_email(
+            to_email=email,
+            subject=subject,
+            message_text=message,
+            button_text="Reset password",
+            button_url=reset_url,
+            fail_silently=True,
         )
 
         return Response({"detail": "If that email exists, a reset link was sent."})
+
 
 
 class PasswordResetConfirmView(APIView):
@@ -92,11 +99,36 @@ class PasswordResetConfirmView(APIView):
 class LoginView(TokenObtainPairView):
     """
     Custom login that returns JWT tokens with username and email embedded.
+    Sends a login alert email asynchronously via Celery.
     """
     permission_classes = [permissions.AllowAny]
     serializer_class = PostlyTokenObtainPairSerializer
 
+    def post(self, request, *args, **kwargs):
+        # 👇 Call the parent implementation (keeps your existing logic)
+        response = super().post(request, *args, **kwargs)
 
+        # If authentication failed, response.data won't have refresh/access
+        if response.status_code != 200:
+            return response
+
+        # The serializer used by TokenObtainPairView attaches "user" to context
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=False)
+        user = serializer.user
+
+        # Extract IP + User Agent
+        ip = (
+            request.META.get("HTTP_X_FORWARDED_FOR")
+            or request.META.get("REMOTE_ADDR")
+        )
+        ua = request.META.get("HTTP_USER_AGENT", "")
+
+        # 🔔 Trigger login alert email (async via Celery)
+        send_login_alert_email.delay(user.id, ip, ua)
+
+        return response
+    
 class EmailConfirmView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -116,11 +148,33 @@ class EmailConfirmView(APIView):
         if not default_token_generator.check_token(user, token):
             return Response({"detail": "Invalid or expired confirmation link."}, status=400)
 
+        # Activate user
         user.is_active = True
         user.save()
 
+        # 📧 Send Welcome Email
+        
+        frontend_base = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
+        dashboard_url = f"{frontend_base}/dashboard"
+
+        welcome_subject = "Welcome to Postly! 🎉"
+        welcome_message = (
+            "Your email has been confirmed and your Postly account is ready to use!<br><br>"
+            "You're all set — start generating ideas, captions, and planning your content.\n\n"
+            "Click below to access your dashboard:"
+        )
+
+        send_postly_email(
+            to_email=user.email,
+            subject=welcome_subject,
+            message_text=welcome_message,
+            button_text="Go to Dashboard",
+            button_url=dashboard_url,
+            fail_silently=True,
+        )
+
         return Response({"detail": "Email confirmed. You can now log in."}, status=200)
-    
+
 
 class ChangePasswordView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -147,4 +201,33 @@ class ChangePasswordView(APIView):
         return Response(
             {"detail": "Password updated successfully."},
             status=status.HTTP_200_OK,
+        )
+    
+
+class NewsletterSendView(APIView):
+    """
+    POST /api/newsletter/send/
+
+    Admin-only endpoint to broadcast a newsletter to all
+    users who have marketing_opt_in=True.
+    """
+    permission_classes = [permissions.IsAdminUser]
+
+    def post(self, request, *args, **kwargs):
+        serializer = NewsletterSendSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        subject = serializer.validated_data["subject"]
+        body = serializer.validated_data["body"]
+        html_body = serializer.validated_data.get("html_body") or None
+
+        # queue background job
+        send_newsletter_email_task.delay(subject, body, html_body)
+
+        return Response(
+            {
+                "detail": "Newsletter queued.",
+                "subject": subject,
+            },
+            status=status.HTTP_202_ACCEPTED,
         )

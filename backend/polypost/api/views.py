@@ -15,13 +15,14 @@ from .models import (
     GlobalTrend, PlannedPostSlot, UseCaseTemplate,
     PlatformTiming, PostPerformance, Plan, 
     Subscription, Draft, MediaUpload, GeneratedCaption,
-    MonthlyUsage
+    MonthlyUsage, PostingReminder
     )
 
 from .serializers import (
     MediaUploadSerializer, RegisterSerializer, CaptionGenerateSerializer,
     GeneratedCaptionSerializer, PlannedPostSlotSerializer, CreatorProfileSerializer,
     PostPerformanceSerializer, DraftSerializer, UseCaseTemplateSerializer,
+    PostingReminderSerializer
     )
 
 from .utils import (
@@ -29,7 +30,7 @@ from .utils import (
     get_trending_stub_hooks, get_trending_topics, get_trending_movies_from_tmdb, get_user_plan
     )
 
-from .utils import check_usage_allowed, increment_usage
+from .utils import check_usage_allowed, increment_usage, send_postly_email
 
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -40,7 +41,6 @@ from django.http import HttpResponse, JsonResponse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.contrib.auth.tokens import default_token_generator
-from django.core.mail import send_mail
 from django.conf import settings
 
 
@@ -77,17 +77,18 @@ class RegisterView(views.APIView):
         subject = "Confirm your Postly account"
         message = (
             "Welcome to Postly!\n\n"
-            "Please confirm your email address by clicking the link below:\n\n"
-            f"{confirm_url}\n\n"
-            "If you didn't create this account, just ignore this email."
+            "Please confirm your email address by clicking the button below.\n\n"
+            "If you didn't create this account, you can ignore this email."
         )
 
-        send_mail(
-            subject,
-            message,
-            getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@postly.local"),
-            [user.email],
-            fail_silently=False,   # avoids dev crashes if email backend not configured
+        # Use the branded HTML template
+        send_postly_email(
+            to_email=user.email,
+            subject=subject,
+            message_text=message,
+            button_text="Confirm email",
+            button_url=confirm_url,
+            fail_silently=True,  # keep silent in MVP / dev
         )
 
         return Response(
@@ -97,8 +98,8 @@ class RegisterView(views.APIView):
             },
             status=status.HTTP_201_CREATED,
         )
-    
-    
+
+
 class MeProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = CreatorProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -844,3 +845,36 @@ class UsageSummaryView(views.APIView):
             "captions_limit": captions_limit,
         }
         return Response(data, status=status.HTTP_200_OK)
+    
+class PostingReminderListCreateView(generics.ListCreateAPIView):
+    """
+    GET /api/schedule/reminders/      -> list my reminders (optionally filtered by date range)
+    POST /api/schedule/reminders/     -> create a reminder
+    """
+    serializer_class = PostingReminderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        qs = PostingReminder.objects.filter(user=self.request.user)
+
+        start = self.request.query_params.get("start")
+        end = self.request.query_params.get("end")
+
+        if start:
+            try:
+                start_dt = datetime.fromisoformat(start)
+                qs = qs.filter(scheduled_at__gte=start_dt)
+            except Exception:
+                pass
+
+        if end:
+            try:
+                end_dt = datetime.fromisoformat(end)
+                qs = qs.filter(scheduled_at__lte=end_dt)
+            except Exception:
+                pass
+
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)

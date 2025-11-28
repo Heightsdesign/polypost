@@ -481,3 +481,50 @@ class AppReview(models.Model):
     def __str__(self):
         who = self.user.username if self.user else "anonymous"
         return f"{self.rating}★ by {who}"
+
+
+# ... existing models ...
+
+class PostingReminder(models.Model):
+    """
+    A scheduled reminder to post content.
+    Optionally tied to a draft.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="posting_reminders",
+    )
+    scheduled_at = models.DateTimeField()
+    platform = models.CharField(max_length=32, blank=True)
+    # if Draft exists in your project, this will resolve
+    draft = models.ForeignKey(
+        "Draft",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="posting_reminders",
+    )
+    note = models.TextField(blank=True)
+
+    notify_email = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["scheduled_at"]
+
+    def __str__(self):
+        return f"{self.user} @ {self.scheduled_at} ({self.platform})"
+
+class NewsletterBlast(models.Model):
+    subject = models.CharField(max_length=200)
+    body = models.TextField()
+    html_body = models.TextField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(blank=True, null=True)
+    recipients_count = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f"Newsletter: {self.subject} ({self.created_at.date()})"

@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import MediaUpload, GeneratedCaption, PlannedPostSlot, PostPerformance, Draft, MediaUpload, GeneratedCaption, CreatorProfile, UseCaseTemplate
+from .models import MediaUpload, GeneratedCaption, PlannedPostSlot, PostPerformance, Draft, MediaUpload, GeneratedCaption, CreatorProfile, UseCaseTemplate, PostingReminder
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -207,3 +207,24 @@ class UseCaseTemplateSerializer(serializers.ModelSerializer):
             "default_platform",
             "example_caption_hint",
         ]
+
+class PostingReminderSerializer(serializers.ModelSerializer):
+    draft_id = serializers.PrimaryKeyRelatedField(
+        queryset=Draft.objects.all(),
+        required=False,
+        allow_null=True,
+        source="draft",
+    )
+
+    class Meta:
+        model = PostingReminder
+        fields = (
+            "id",
+            "scheduled_at",
+            "platform",
+            "draft_id",
+            "note",
+            "notify_email",
+            "created_at",
+        )
+        read_only_fields = ("id", "created_at")

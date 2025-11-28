@@ -11,9 +11,9 @@ from .views import (
     SchedulerSuggestionsView, AnalyticsIngestView, StripeCheckoutSessionView,
     StripeWebhookView, MySubscriptionView, DraftListCreateView,
     DraftPinView, DraftArchiveView, UseCaseTemplateListView,
-    ApplyUseCaseTemplateView, MeProfileView, UsageSummaryView
+    ApplyUseCaseTemplateView, MeProfileView, UsageSummaryView, PostingReminderListCreateView
     )
-from .views_auth import PasswordResetRequestView, PasswordResetConfirmView, LoginView, EmailConfirmView, ChangePasswordView
+from .views_auth import PasswordResetRequestView, PasswordResetConfirmView, LoginView, EmailConfirmView, ChangePasswordView, NewsletterSendView
 
 from .views_feedback import (
     SupportTicketCreateView,
@@ -33,7 +33,10 @@ urlpatterns = [
     path("scheduler/suggestions/", PostingSuggestionView.as_view(), name="posting-suggestions"),
     path("scheduler/plan/", PlanSlotView.as_view(), name="scheduler-plan"),
     path("scheduler/my/", MyPlannedSlotsView.as_view(), name="scheduler-my"),
+
     path("scheduler/suggestions/", SchedulerSuggestionsView.as_view(), name="scheduler-suggestions"),
+    path("schedule/reminders/", PostingReminderListCreateView.as_view(), name="posting-reminders"),
+
     path("analytics/ingest/", AnalyticsIngestView.as_view(), name="analytics-ingest"),
     path("billing/create-checkout-session/", StripeCheckoutSessionView.as_view(), name="stripe-checkout"),
     path("billing/webhook/", StripeWebhookView.as_view(), name="stripe-webhook"),
@@ -60,5 +63,7 @@ urlpatterns = [
     path("reviews/featured/", AppReviewFeaturedListView.as_view(), name="reviews-featured"),
 
     path("usage/summary/", UsageSummaryView.as_view(), name="usage-summary"),
+
+    path("newsletter/send/", NewsletterSendView.as_view(), name="newsletter-send"),
 
 ] + router.urls

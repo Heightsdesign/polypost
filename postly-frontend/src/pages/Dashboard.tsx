@@ -15,6 +15,9 @@ import BlobOrange from "../assets/blobs/blob-3.png";
 import BlobGreen from "../assets/blobs/blob-4.png";
 import BlobPurpleDot from "../assets/blobs/blob-6.png";
 import BlobRedLarge from "../assets/blobs/blob-5.png";
+import SchedulerWidget, { type Reminder } from "../components/SchedulerWidget";
+
+
 
 // simple modal
 function Modal({
@@ -61,7 +64,6 @@ export default function Dashboard() {
   // modals
   const [openIdeas, setOpenIdeas] = useState(false);
   const [openUpload, setOpenUpload] = useState(false);
-  const [openScheduler, setOpenScheduler] = useState(false);
 
   // ideas
   const [ideas, setIdeas] = useState<any[]>([]);
@@ -77,9 +79,7 @@ export default function Dashboard() {
   const [savingMediaDraft, setSavingMediaDraft] = useState(false);
 
   // scheduler
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [mySlots, setMySlots] = useState<any[]>([]);
-  const [schedulerLoading, setSchedulerLoading] = useState(false);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
 
   const [mediaDraftTitle, setMediaDraftTitle] = useState("");
 
@@ -115,23 +115,16 @@ export default function Dashboard() {
 
   // load scheduler when modal opens
   useEffect(() => {
-    if (!openScheduler) return;
     (async () => {
-      setSchedulerLoading(true);
       try {
-        const sug = await api.get(
-          "/scheduler/suggestions/?platform=instagram&days=3"
-        );
-        setSuggestions(sug.data.days || []);
-        const mine = await api.get("/scheduler/my/");
-        setMySlots(mine.data || []);
-      } catch (e) {
-        console.warn(e);
-      } finally {
-        setSchedulerLoading(false);
+        const res = await api.get("/schedule/reminders/");
+        setReminders(res.data || []);
+      } catch (err) {
+        console.warn("Could not load reminders", err);
       }
     })();
-  }, [openScheduler]);
+  }, []);
+
 
   // ----- handlers -----
   async function handleGenerateIdeas() {
@@ -243,30 +236,6 @@ export default function Dashboard() {
       setUploadStatus("Failed to save draft.");
     } finally {
       setSavingMediaDraft(false);
-    }
-  }
-  async function handleSaveSlot(slot: any) {
-    try {
-      await api.post("/scheduler/plan/", {
-        platform: slot.platform,
-        scheduled_at: slot.datetime,
-        title: "Planned from dashboard",
-        notify: true,
-      });
-      const mine = await api.get("/scheduler/my/");
-      setMySlots(mine.data || []);
-      setSuggestions((prev) =>
-        prev.map((day: any) => ({
-          ...day,
-          slots: day.slots.map((s: any) =>
-            s.datetime === slot.datetime && s.platform === slot.platform
-              ? { ...s, saved: true }
-              : s
-          ),
-        }))
-      );
-    } catch (e) {
-      console.warn(e);
     }
   }
 
@@ -443,7 +412,10 @@ export default function Dashboard() {
                     </p>
                   </div>
                   <button
-                    onClick={() => setOpenScheduler(true)}
+                    onClick={() => {
+                      const el = document.getElementById("dashboard-scheduler");
+                      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }}
                     className="mt-4 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
                     type="button"
                   >
@@ -452,6 +424,11 @@ export default function Dashboard() {
                 </div>
               </div>
             </section>
+            <SchedulerWidget
+              reminders={reminders}
+              setReminders={setReminders}
+              drafts={recentDrafts}
+            />
 
             {/* reviews */}
             <section className="rounded-3xl bg-white/80 backdrop-blur-xl border border-white/40 shadow-md p-5 md:p-6">
@@ -491,7 +468,7 @@ export default function Dashboard() {
                     Scheduled posts
                   </p>
                   <p className="text-lg font-semibold text-amber-600">
-                    {mySlots.length}
+                    {reminders.length}
                   </p>
                 </div>
               </div>
@@ -689,73 +666,6 @@ export default function Dashboard() {
               >
                 {savingMediaDraft ? "Saving..." : "Save as draft"}
               </button>
-            </div>
-          )}
-        </Modal>
-
-        {/* Scheduler */}
-        <Modal
-          open={openScheduler}
-          onClose={() => setOpenScheduler(false)}
-          title="Best times to post"
-        >
-          {schedulerLoading && (
-            <p className="text-xs md:text-sm text-dark/75">Loading...</p>
-          )}
-
-          {!schedulerLoading && (
-            <div className="space-y-4">
-              {suggestions.map((day: any) => (
-                <div key={day.date} className="border-b border-purple/10 pb-3">
-                  <h4 className="text-xs md:text-sm font-semibold text-dark mb-1">
-                    {day.date}
-                  </h4>
-                  {day.slots.length === 0 && (
-                    <p className="text-[0.8rem] text-dark/65">
-                      No suggestions for this day.
-                    </p>
-                  )}
-                  <ul className="space-y-1 text-[0.8rem] text-dark/80">
-                    {day.slots.map((slot: any) => (
-                      <li key={slot.datetime}>
-                        {slot.time} – {slot.platform} (score{" "}
-                        {slot.engagement_score})
-                        {slot.saved ? (
-                          <span className="ml-2 text-green-600">✅ saved</span>
-                        ) : (
-                          <button
-                            className="ml-2 rounded-full bg-purple/10 px-2 py-0.5 text-[0.7rem] font-semibold text-purple hover:bg-purple/20 transition-all"
-                            type="button"
-                            onClick={() => handleSaveSlot(slot)}
-                          >
-                            Save
-                          </button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-
-              <div className="mt-3">
-                <h4 className="text-xs md:text-sm font-semibold text-dark mb-1">
-                  My scheduled posts
-                </h4>
-                {mySlots.length === 0 ? (
-                  <p className="text-[0.8rem] text-dark/65">
-                    Nothing scheduled yet.
-                  </p>
-                ) : (
-                  <ul className="space-y-1 text-[0.8rem] text-dark/80">
-                    {mySlots.map((s: any) => (
-                      <li key={s.id}>
-                        {s.platform} – {s.scheduled_at}{" "}
-                        {s.notify ? "🔔" : ""}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
             </div>
           )}
         </Modal>

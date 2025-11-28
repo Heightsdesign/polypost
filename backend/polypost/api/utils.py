@@ -4,30 +4,67 @@ from datetime import date
 import os
 import requests
 
-from .models import MonthlyUsage, Subscription, Plan
+
+from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.utils.timezone import now
-from .email_templates import POSTLY_EMAIL_TEMPLATE
 
-def send_postly_email(to, title, message, button_text, button_url):
-    html = (POSTLY_EMAIL_TEMPLATE
-            .replace("{{TITLE}}", title)
-            .replace("{{MESSAGE}}", message)
-            .replace("{{BUTTON_TEXT}}", button_text)
-            .replace("{{BUTTON_URL}}", button_url)
-            .replace("{{YEAR}}", str(now().year)))
+from .email_templates import POSTLY_EMAIL_TEMPLATE
+from .models import MonthlyUsage, Subscription, Plan
+
+
+
+def render_postly_email_html(title: str, message: str, button_text: str, button_url: str) -> str:
+    """
+    Simple string-based templating using the base POSTLY_EMAIL_TEMPLATE.
+    """
+    html = (
+        POSTLY_EMAIL_TEMPLATE
+        .replace("{{TITLE}}", title)
+        .replace("{{MESSAGE}}", message)
+        .replace("{{BUTTON_TEXT}}", button_text)
+        .replace("{{BUTTON_URL}}", button_url)
+        .replace("{{YEAR}}", str(now().year))
+    )
+    return html
+
+
+def send_postly_email(
+    to_email: str,
+    subject: str,
+    message_text: str,
+    button_text: str,
+    button_url: str,
+    fail_silently: bool = True,
+):
+    """
+    Reusable helper to send a branded Postly HTML email with a button,
+    plus a plain-text fallback.
+    """
+    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@polypost-platform.com")
+
+    html_body = render_postly_email_html(
+        title=subject,
+        message=message_text,
+        button_text=button_text,
+        button_url=button_url,
+    )
 
     email = EmailMultiAlternatives(
-        subject=title,
-        body=message,  # fallback text
-        from_email="Postly <no-reply@polypost-platform.com>",
-        to=[to],
+        subject=subject,
+        body=message_text,  # plain text fallback
+        from_email=from_email,
+        to=[to_email],
     )
-    email.attach_alternative(html, "text/html")
-    email.send()
+    email.attach_alternative(html_body, "text/html")
 
-
-
+    try:
+        email.send(fail_silently=fail_silently)
+    except Exception:
+        if not fail_silently:
+            raise
+        # in fail_silently=True mode, swallow SES/network errors
+        
 def get_trending_topics():
     """
     Fetch trending topics from an external API.
@@ -56,6 +93,7 @@ def get_trending_topics():
         "A currently viral TikTok sound",
         "A meme format that's being remixed",
     ]
+
 
 def get_trending_movies_from_tmdb():
     tmdb_key = os.getenv("TMDB_API_KEY")
@@ -266,19 +304,57 @@ def check_usage_allowed(user, kind: str, amount: int = 1) -> bool:
 
 def increment_usage(user, kind: str, amount: int = 1):
     """
-    Increment usage counters by given amount.
+    Increment usage counters and send upgrade nudges when limits are hit.
     """
-    # plan not strictly needed here but you might want it later
+    from .tasks import send_postly_email_task
+
     plan = get_user_plan(user)
     usage = get_current_usage(user)
 
+    frontend = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
+    pricing_url = f"{frontend}/pricing"
+
+    # ---- APPLY USAGE INCREASE ----
     if kind == "idea":
         usage.ideas_used += amount
+        usage.save()
+
+        limit = plan.ideas_per_month or 0
+
+        # If limit reached/exceeded → send upgrade email ONCE
+        if limit > 0 and usage.ideas_used >= limit:
+            # avoid sending multiple nudges in the same month
+            if usage.ideas_used - amount < limit:  
+                send_postly_email_task.delay(
+                    user.email,
+                    "You've reached your monthly idea limit",
+                    (
+                        "You've used all idea generations included in your Polypost plan.<br><br>"
+                        "Upgrade to unlock more ideas instantly."
+                    ),
+                    "View plans",
+                    pricing_url,
+                )
+
     elif kind == "caption":
         usage.captions_used += amount
+        usage.save()
 
-    usage.save()
+        limit = plan.captions_per_month or 0
 
+        if limit > 0 and usage.captions_used >= limit:
+            # only fire the email on the EXACT step crossing the limit
+            if usage.captions_used - amount < limit:
+                send_postly_email_task.delay(
+                    user.email,
+                    "You've reached your monthly caption limit",
+                    (
+                        "You've used all caption generations included in your Polypost plan.<br><br>"
+                        "Upgrade now to continue generating captions."
+                    ),
+                    "View plans",
+                    pricing_url,
+                )
 
 def user_has_active_subscription(user):
     if not user.is_authenticated:
