@@ -228,3 +228,17 @@ class PostingReminderSerializer(serializers.ModelSerializer):
             "created_at",
         )
         read_only_fields = ("id", "created_at")
+
+class BrandPersonaRequestSerializer(serializers.Serializer):
+    creator_stage = serializers.CharField(required=False, allow_blank=True)
+    platforms = serializers.ListField(
+        child=serializers.CharField(), required=False
+    )
+    niche = serializers.CharField(required=False, allow_blank=True)
+    target_audience = serializers.CharField(required=False, allow_blank=True)
+    goals = serializers.CharField(required=False, allow_blank=True)
+    comfort_level = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="How comfortable they are on camera / being explicit / being goofy, etc.",
+    )

@@ -1,5 +1,6 @@
 // src/pages/register/RegisterSteps/StepTone.tsx
 import React, { useState } from "react";
+import api from "../../../api"; // <-- added
 
 type StepToneProps = {
   onNext: (data: {
@@ -53,6 +54,64 @@ const StepTone: React.FC<StepToneProps> = ({ onNext, onBack }) => {
     content_languages: "en",
   });
 
+  // ---------------------------
+  // BRAND ASSISTANT (new)
+  // ---------------------------
+  const [openBrandModal, setOpenBrandModal] = useState(false);
+  const [brandLoading, setBrandLoading] = useState(false);
+  const [brandError, setBrandError] = useState<string | null>(null);
+  const [brandPersona, setBrandPersona] = useState<any | null>(null);
+
+  const [brandForm, setBrandForm] = useState({
+    niche: "",
+    target_audience: "",
+    goals: "",
+    comfort_level: "",
+  });
+
+  async function generateBrandPersona() {
+    setBrandLoading(true);
+    setBrandError(null);
+    setBrandPersona(null);
+
+    try {
+      const res = await api.post("/brand/persona/", {
+        niche: brandForm.niche || data.niche,
+        target_audience: brandForm.target_audience || data.target_audience,
+        goals: brandForm.goals,
+        comfort_level: brandForm.comfort_level,
+      });
+
+      const persona = res.data;
+      setBrandPersona(persona);
+
+      // Auto-fill fields for user
+      if (persona.recommended_vibe) {
+        setData((prev) => ({ ...prev, vibe: persona.recommended_vibe }));
+      }
+      if (persona.recommended_tone) {
+        setData((prev) => ({ ...prev, tone: persona.recommended_tone }));
+      }
+      if (persona.niche && !data.niche) {
+        setData((prev) => ({ ...prev, niche: persona.niche }));
+      }
+      if (persona.target_audience && !data.target_audience) {
+        setData((prev) => ({ ...prev, target_audience: persona.target_audience }));
+      }
+    } catch (err) {
+      console.error(err);
+      setBrandError("Could not generate a brand persona. Try again.");
+    } finally {
+      setBrandLoading(false);
+    }
+  }
+
+  function applyPersonaAndClose() {
+    setOpenBrandModal(false);
+  }
+
+  // ----------------------------------
+
   const updateField =
     (field: keyof typeof data) =>
     (
@@ -78,7 +137,7 @@ const StepTone: React.FC<StepToneProps> = ({ onNext, onBack }) => {
 
   return (
     <div className="relative">
-      {/* soft violet blob behind left side */}
+      {/* background blob */}
       <div
         className="pointer-events-none absolute -top-8 -left-24 w-48 h-48 rounded-full bg-purple/15 blur-3xl"
         aria-hidden="true"
@@ -150,7 +209,7 @@ const StepTone: React.FC<StepToneProps> = ({ onNext, onBack }) => {
               value={data.niche}
               onChange={updateField("niche")}
               placeholder="Fitness, comedy, beauty, finance…"
-              className="w-full rounded-2xl border border-purple/15 bg-white/90 px-3 py-2 text-sm placeholder:text-dark/40 focus:outline-none focus:ring-2 focus:ring-purple focus:border-purple/40"
+              className="w-full rounded-2xl border border-purple/15 bg-white/90 px-3 py-2 text-sm placeholder:text-dark/40 focus:ring-purple"
             />
           </div>
           <div>
@@ -162,12 +221,12 @@ const StepTone: React.FC<StepToneProps> = ({ onNext, onBack }) => {
               value={data.target_audience}
               onChange={updateField("target_audience")}
               placeholder="e.g. Gen Z women, busy parents…"
-              className="w-full rounded-2xl border border-purple/15 bg-white/90 px-3 py-2 text-sm placeholder:text-dark/40 focus:outline-none focus:ring-2 focus:ring-purple focus:border-purple/40"
+              className="w-full rounded-2xl border border-purple/15 bg-white/90 px-3 py-2 text-sm placeholder:text-dark/40 focus:ring-purple"
             />
           </div>
         </div>
 
-        {/* Content language dropdown */}
+        {/* Language */}
         <div>
           <label className="block text-xs font-semibold text-dark/70 mb-1">
             Main content language
@@ -175,7 +234,7 @@ const StepTone: React.FC<StepToneProps> = ({ onNext, onBack }) => {
           <select
             value={data.content_languages}
             onChange={updateField("content_languages")}
-            className="w-full rounded-2xl border border-purple/15 bg-white/90 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple focus:border-purple/40"
+            className="w-full rounded-2xl border border-purple/15 bg-white/90 px-3 py-2 text-sm focus:ring-purple"
           >
             {LANGUAGES.map((lang) => (
               <option key={lang.code} value={lang.code}>
@@ -188,23 +247,149 @@ const StepTone: React.FC<StepToneProps> = ({ onNext, onBack }) => {
           </p>
         </div>
 
+        {/* BRAND ASSISTANT BUTTON */}
+        <div className="mt-4 rounded-2xl bg-white/70 border border-purple/10 px-3 py-3">
+          <p className="text-[0.75rem] text-dark/70 mb-2">
+            Not sure how to fill this section?{" "}
+            <span className="font-semibold text-purple">Optional</span>:  
+            let AI suggest a vibe, tone & niche based on your goals.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => setOpenBrandModal(true)}
+            className="inline-flex items-center justify-center rounded-2xl bg-purple/10 px-3 py-1.5 text-[0.75rem] font-semibold text-purple hover:bg-purple/15 transition-all"
+          >
+            🎭 Open brand assistant
+          </button>
+        </div>
+
+        {/* navigation */}
         <div className="mt-5 flex gap-3">
           <button
             type="button"
             onClick={handleBackClick}
-            className="flex-1 rounded-2xl border border-purple/20 bg-white/90 px-4 py-2.5 text-sm font-semibold text-purple hover:bg-white shadow-sm transition-all"
+            className="flex-1 rounded-2xl border border-purple/20 bg-white/90 px-4 py-2.5 text-sm font-semibold text-purple hover:bg-white"
           >
             ← Back
           </button>
           <button
             type="button"
             onClick={handleNext}
-            className="flex-1 rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
+            className="flex-1 rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2.5 text-sm font-semibold text-white shadow-md"
           >
             Next →
           </button>
         </div>
       </div>
+
+      {/* BRAND ASSISTANT MODAL */}
+      {openBrandModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm px-4">
+          <div className="relative w-full max-w-xl rounded-3xl bg-white/95 p-5 shadow-2xl border border-purple/10">
+            <button
+              type="button"
+              onClick={() => setOpenBrandModal(false)}
+              className="absolute top-3 right-3 h-8 w-8 flex items-center justify-center rounded-full bg-purple/5 hover:bg-purple/10"
+            >
+              ✕
+            </button>
+
+            <h2 className="text-lg font-semibold text-dark mb-3">
+              Brand assistant (optional)
+            </h2>
+
+            <div className="space-y-3 text-xs md:text-sm">
+              <input
+                className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2"
+                placeholder="Your niche"
+                value={brandForm.niche}
+                onChange={(e) =>
+                  setBrandForm({ ...brandForm, niche: e.target.value })
+                }
+              />
+              <input
+                className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2"
+                placeholder="Target audience"
+                value={brandForm.target_audience}
+                onChange={(e) =>
+                  setBrandForm({ ...brandForm, target_audience: e.target.value })
+                }
+              />
+              <textarea
+                className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2"
+                placeholder="Your goals"
+                rows={3}
+                value={brandForm.goals}
+                onChange={(e) =>
+                  setBrandForm({ ...brandForm, goals: e.target.value })
+                }
+              />
+              <input
+                className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2"
+                placeholder="Comfort level"
+                value={brandForm.comfort_level}
+                onChange={(e) =>
+                  setBrandForm({ ...brandForm, comfort_level: e.target.value })
+                }
+              />
+
+              {brandError && (
+                <p className="text-xs text-red-600">{brandError}</p>
+              )}
+
+              <button
+                type="button"
+                onClick={generateBrandPersona}
+                disabled={brandLoading}
+                className="w-full inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 font-semibold text-white shadow-md disabled:opacity-60"
+              >
+                {brandLoading ? "Thinking…" : "Generate brand persona"}
+              </button>
+            </div>
+
+            {/* RESULT */}
+            {brandPersona && (
+              <div className="mt-5 space-y-3 text-xs md:text-sm">
+                <h3 className="font-semibold text-dark text-base">
+                  {brandPersona.persona_name}
+                </h3>
+                <p>{brandPersona.brand_summary}</p>
+
+                <p>
+                  <strong>Vibe:</strong> {brandPersona.recommended_vibe}
+                  <br />
+                  <strong>Tone:</strong> {brandPersona.recommended_tone}
+                </p>
+
+                <strong>Content pillars:</strong>
+                <ul className="list-disc ml-4">
+                  {brandPersona.content_pillars?.map((p: string, i: number) => (
+                    <li key={i}>{p}</li>
+                  ))}
+                </ul>
+
+                {brandPersona.brand_bio && (
+                  <>
+                    <strong>Suggested bio:</strong>
+                    <p className="rounded-2xl bg-purple/5 border border-purple/10 px-3 py-2 mt-1">
+                      {brandPersona.brand_bio}
+                    </p>
+                  </>
+                )}
+
+                <button
+                  type="button"
+                  onClick={applyPersonaAndClose}
+                  className="mt-2 inline-flex items-center justify-center rounded-2xl bg-purple/10 px-3 py-1.5 text-[0.75rem] font-semibold text-purple hover:bg-purple/15"
+                >
+                  Use these suggestions
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

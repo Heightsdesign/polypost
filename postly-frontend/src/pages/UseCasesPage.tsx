@@ -18,6 +18,39 @@ export default function UseCasesPage() {
   const [templates, setTemplates] = useState<UseCaseTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
+  // BRAND ASSISTANT (AI persona generator)
+  const [openBrandModal, setOpenBrandModal] = useState(false);
+  const [brandLoading, setBrandLoading] = useState(false);
+  const [brandForm, setBrandForm] = useState({
+    niche: "",
+    target_audience: "",
+    goals: "",
+    comfort_level: "",
+  });
+  const [brandPersona, setBrandPersona] = useState<any | null>(null);
+  const [brandToast, setBrandToast] = useState<string | null>(null);
+
+  async function generateBrandPersona() {
+    setBrandLoading(true);
+    setBrandPersona(null);
+
+    try {
+      const res = await api.post("/brand/persona/", {
+        niche: brandForm.niche,
+        target_audience: brandForm.target_audience,
+        goals: brandForm.goals,
+        comfort_level: brandForm.comfort_level,
+      });
+      setBrandPersona(res.data);
+    } catch (err) {
+      console.error(err);
+      setBrandToast("⚠️ Could not generate brand persona.");
+      setTimeout(() => setBrandToast(null), 3500);
+    } finally {
+      setBrandLoading(false);
+    }
+  }
+
 
   useEffect(() => {
     async function loadTemplates() {
@@ -104,6 +137,25 @@ export default function UseCasesPage() {
             from day one.
           </p>
         </header>
+
+        {/* Brand Assistant intro card */}
+        <section className="mb-10 rounded-3xl bg-white/60 backdrop-blur border border-purple/10 shadow-sm px-5 py-6">
+          <h2 className="text-sm md:text-base font-semibold text-dark mb-1 flex items-center gap-2">
+            🎭 Define your creator brand (AI-powered)
+          </h2>
+          <p className="text-xs md:text-sm text-dark/70 mb-3 max-w-2xl">
+            Not sure about your vibe, tone or niche? Answer a few questions and Postly
+            will generate a personalized brand persona with suggested style, bio and content pillars.
+          </p>
+
+          <button
+            onClick={() => setOpenBrandModal(true)}
+            className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] transition-all"
+          >
+            Start brand assistant
+          </button>
+        </section>
+
 
         {/* Two-column content: how it works + presets intro */}
         <section className="mb-10 grid gap-6 md:grid-cols-[1.1fr,1fr]">
@@ -219,6 +271,98 @@ export default function UseCasesPage() {
               ))}
             </div>
           </section>
+        )}
+
+        {/* BRAND ASSISTANT MODAL */}
+        {openBrandModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm px-4">
+            <div className="relative w-full max-w-xl rounded-3xl bg-white/95 p-5 md:p-6 shadow-2xl border border-purple/10">
+              {/* Close button */}
+              <button
+                onClick={() => setOpenBrandModal(false)}
+                className="absolute top-3 right-3 h-8 w-8 flex items-center justify-center rounded-full bg-purple/5 text-dark/70 hover:bg-purple/10"
+              >
+                ✕
+              </button>
+
+              <h2 className="text-lg font-semibold text-dark mb-3">
+                Define your creator brand
+              </h2>
+
+              <div className="space-y-3 text-xs md:text-sm text-dark/80">
+                <input
+                  className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2"
+                  placeholder="Your niche (fitness, modeling, gamer, OF, beauty...)"
+                  value={brandForm.niche}
+                  onChange={(e) => setBrandForm({ ...brandForm, niche: e.target.value })}
+                />
+
+                <input
+                  className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2"
+                  placeholder="Who do you want to attract?"
+                  value={brandForm.target_audience}
+                  onChange={(e) => setBrandForm({ ...brandForm, target_audience: e.target.value })}
+                />
+
+                <textarea
+                  className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2"
+                  placeholder="Your goals (grow fast, build fans, increase OF income...)"
+                  rows={3}
+                  value={brandForm.goals}
+                  onChange={(e) => setBrandForm({ ...brandForm, goals: e.target.value })}
+                />
+
+                <input
+                  className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2"
+                  placeholder="Comfort level (playful, serious, explicit, introverted...)"
+                  value={brandForm.comfort_level}
+                  onChange={(e) => setBrandForm({ ...brandForm, comfort_level: e.target.value })}
+                />
+
+                <button
+                  onClick={generateBrandPersona}
+                  disabled={brandLoading}
+                  className="w-full mt-2 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 font-semibold text-white shadow-md shadow-purple/30 disabled:opacity-60"
+                >
+                  {brandLoading ? "Thinking..." : "Generate brand persona"}
+                </button>
+              </div>
+
+              {/* RESULT */}
+              {brandPersona && (
+                <div className="mt-6 space-y-3 text-xs md:text-sm text-dark/85">
+                  <h3 className="font-semibold text-dark text-base">
+                    {brandPersona.persona_name}
+                  </h3>
+
+                  <p>{brandPersona.brand_summary}</p>
+
+                  <div className="text-[0.8rem] text-dark/70">
+                    <strong>Vibe</strong>: {brandPersona.recommended_vibe} <br />
+                    <strong>Tone</strong>: {brandPersona.recommended_tone}
+                  </div>
+
+                  <div>
+                    <strong>Content pillars:</strong>
+                    <ul className="list-disc list-inside ml-2">
+                      {brandPersona.content_pillars?.map((p: string, i: number) => (
+                        <li key={i}>{p}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {brandPersona.brand_bio && (
+                    <div>
+                      <strong>Suggested bio:</strong>
+                      <p className="mt-1 rounded-2xl bg-purple/5 border border-purple/10 px-3 py-2">
+                        {brandPersona.brand_bio}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {/* Toast */}

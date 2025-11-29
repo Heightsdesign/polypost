@@ -14,6 +14,7 @@ from collections import Counter
 from datetime import datetime, timezone as dt_timezone
 from datetime import timedelta
 from .utils import send_postly_email, get_current_usage
+from django.core.mail import send_mail
 
 
 
@@ -167,29 +168,20 @@ def send_weekly_summary_email():
         )
 
 # api/tasks.py
-from celery import shared_task
-from django.conf import settings
-from django.core.mail import send_mail
-
-
 @shared_task
-def send_newsletter_email_task(subject: str, body_text: str, html_body: str | None = None):
-    """
-    Send a newsletter email to all users who opted in (marketing_opt_in=True).
-    Runs in the background via Celery.
-    """
+def send_newsletter_email_task(blast_id: int, subject: str, body_text: str, html_body: str | None):
+    from .models import CreatorProfile, NewsletterBlast
     from django.contrib.auth import get_user_model
-    from .models import CreatorProfile
 
-    User = get_user_model()
+    blast = NewsletterBlast.objects.get(id=blast_id)
 
-    # Only profiles that have opted in & whose user is active + has an email
     qs = CreatorProfile.objects.filter(
         marketing_opt_in=True,
         user__is_active=True,
     ).select_related("user")
 
-    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "Polypost <no-reply@example.com>")
+    from_email = settings.DEFAULT_FROM_EMAIL
+    count = 0
 
     for profile in qs.iterator():
         email = profile.user.email
@@ -205,6 +197,10 @@ def send_newsletter_email_task(subject: str, body_text: str, html_body: str | No
                 html_message=html_body,
                 fail_silently=False,
             )
+            count += 1
         except Exception as e:
-            # For MVP: just log, don't crash the task
-            print(f"[NEWSLETTER] Failed to send to {email}: {e}")
+            print(f"Failed to send newsletter to {email}: {e}")
+
+    blast.sent_at = timezone.now()
+    blast.recipients_count = count
+    blast.save()

@@ -108,6 +108,12 @@ class CreatorProfile(models.Model):
         default="starter",
     )
 
+    brand_persona = models.TextField(
+        blank=True,
+        null=True,
+        help_text="JSON blob with AI-generated brand persona (summary, pillars, etc.).",
+    )
+
 
     def __str__(self):
         return f"{self.user.username} Profile"

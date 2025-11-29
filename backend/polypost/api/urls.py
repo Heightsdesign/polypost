@@ -21,6 +21,7 @@ from .views_feedback import (
     AppReviewFeaturedListView,
 )
 
+from .views_brand import BrandPersonaView
 
 router = DefaultRouter()
 router.register(r"uploads", MediaUploadViewSet, basename="uploads")
@@ -44,6 +45,7 @@ urlpatterns = [
     path("drafts/", DraftListCreateView.as_view(), name="draft-list-create"),
     path("drafts/<uuid:pk>/pin/", DraftPinView.as_view(), name="draft-pin"),
     path("drafts/<uuid:pk>/archive/", DraftArchiveView.as_view(), name="draft-archive"),
+    path("brand/persona/", BrandPersonaView.as_view(), name="brand-persona"),
 
     path("auth/password-reset/", PasswordResetRequestView.as_view(), name="password-reset"),
     path("auth/password-reset/confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
