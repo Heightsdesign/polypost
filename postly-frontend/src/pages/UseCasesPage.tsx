@@ -31,11 +31,23 @@ export default function UseCasesPage() {
   const [brandError, setBrandError] = useState<string | null>(null);
   const [selectedPersonaIndex, setSelectedPersonaIndex] = useState<number | null>(null);
 
+  // 🔹 Bio variants from AI (for the currently refined persona)
+  const [bioVariants, setBioVariants] = useState<{
+    short_bio?: string;
+    long_bio?: string;
+    cta_bio?: string;
+    fun_bio?: string;
+  } | null>(null);
+  const [bioLoading, setBioLoading] = useState(false);
+  const [bioPersonaIndex, setBioPersonaIndex] = useState<number | null>(null);
+
   async function generateBrandPersona() {
     setBrandLoading(true);
     setBrandError(null);
     setBrandPersonas([]);
     setSelectedPersonaIndex(null);
+    setBioVariants(null);
+    setBioPersonaIndex(null);
 
     try {
       const res = await api.post("/brand/persona/", {
@@ -83,6 +95,48 @@ export default function UseCasesPage() {
       setToast("⚠️ Could not apply persona. Please try again.");
       setTimeout(() => setToast(null), 3500);
     }
+  }
+
+  // 🔹 Call backend to refine bio for a given persona index
+  async function refineBio(idx: number) {
+    const p = brandPersonas[idx];
+    if (!p || !p.brand_bio) {
+      setToast("No base bio to refine for this persona.");
+      setTimeout(() => setToast(null), 2500);
+      return;
+    }
+
+    setBioLoading(true);
+    setBioPersonaIndex(idx);
+    setBioVariants(null);
+
+    try {
+      const res = await api.post("/brand/bio-variants/", {
+        base_bio: p.brand_bio,
+        platform: p.main_platform || "instagram",
+        preferred_language: p.preferred_language || "en",
+        niche: p.niche || brandForm.niche,
+        target_audience: p.target_audience || brandForm.target_audience,
+        vibe: p.recommended_vibe,
+        tone: p.recommended_tone,
+        creator_stage: p.creator_stage || undefined,
+      });
+
+      setBioVariants(res.data);
+    } catch (err) {
+      console.error(err);
+      setToast("⚠️ Could not refine bio.");
+      setTimeout(() => setToast(null), 3500);
+    } finally {
+      setBioLoading(false);
+    }
+  }
+
+  function copyBio(text?: string) {
+    if (!text) return;
+    navigator.clipboard.writeText(text).catch(() => {});
+    setToast("📋 Bio copied to clipboard");
+    setTimeout(() => setToast(null), 2000);
   }
 
   useEffect(() => {
@@ -245,6 +299,8 @@ export default function UseCasesPage() {
 
               {brandPersonas.map((p, idx) => {
                 const active = selectedPersonaIndex === idx;
+                const isThisBioLoading = bioLoading && bioPersonaIndex === idx;
+
                 return (
                   <div
                     key={idx}
@@ -286,10 +342,127 @@ export default function UseCasesPage() {
                       </p>
                     )}
 
+                    {/* Base bio + refine controls */}
                     {p.brand_bio && (
-                      <p className="mt-3 rounded-2xl bg-purple/5 border border-purple/10 px-3 py-2 text-[0.75rem]">
-                        <strong>Bio idea:</strong> {p.brand_bio}
-                      </p>
+                      <div className="mt-3 space-y-2">
+                        <div className="flex items-start gap-2">
+                          <p className="flex-1 rounded-2xl bg-purple/5 border border-purple/10 px-3 py-2 text-[0.75rem]">
+                            <strong>Bio idea:</strong> {p.brand_bio}
+                          </p>
+                          <div className="flex flex-col gap-1">
+                            <button
+                              type="button"
+                              onClick={() => copyBio(p.brand_bio)}
+                              className="rounded-xl bg-purple text-white px-3 py-1 text-xs font-semibold hover:bg-purple/90"
+                            >
+                              Copy
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => refineBio(idx)}
+                              disabled={isThisBioLoading}
+                              className="rounded-2xl bg-white border border-purple/30 px-2 py-1 text-[0.7rem] font-semibold text-purple hover:bg-purple/5 disabled:opacity-60"
+                            >
+                              {isThisBioLoading
+                                ? "Refining…"
+                                : "Refine bio"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Bio variants for THIS persona */}
+                        {bioPersonaIndex === idx && bioVariants && (
+                          <div className="grid gap-2 md:grid-cols-2 text-[0.75rem]">
+                            {bioVariants.short_bio && (
+                              <div className="rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="font-semibold text-dark">
+                                    Short bio
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      copyBio(bioVariants.short_bio)
+                                    }
+                                    className="rounded-xl bg-purple text-white px-3 py-1 text-xs font-semibold hover:bg-purple/90"
+                                  >
+                                    Copy
+                                  </button>
+                                </div>
+                                <p className="text-dark/80">
+                                  {bioVariants.short_bio}
+                                </p>
+                              </div>
+                            )}
+
+                            {bioVariants.long_bio && (
+                              <div className="rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="font-semibold text-dark">
+                                    Long bio
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      copyBio(bioVariants.long_bio)
+                                    }
+                                    className="rounded-xl bg-purple text-white px-3 py-1 text-xs font-semibold hover:bg-purple/90"
+                                  >
+                                    Copy
+                                  </button>
+                                </div>
+                                <p className="text-dark/80">
+                                  {bioVariants.long_bio}
+                                </p>
+                              </div>
+                            )}
+
+                            {bioVariants.cta_bio && (
+                              <div className="rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="font-semibold text-dark">
+                                    CTA-optimized
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      copyBio(bioVariants.cta_bio)
+                                    }
+                                    className="rounded-xl bg-purple text-white px-3 py-1 text-xs font-semibold hover:bg-purple/90"
+                                  >
+                                    Copy
+                                  </button>
+                                </div>
+                                <p className="text-dark/80">
+                                  {bioVariants.cta_bio}
+                                </p>
+                              </div>
+                            )}
+
+                            {bioVariants.fun_bio && (
+                              <div className="rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="font-semibold text-dark">
+                                    Fun / playful
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      copyBio(bioVariants.fun_bio)
+                                    }
+                                    className="rounded-xl bg-purple text-white px-3 py-1 text-xs font-semibold hover:bg-purple/90"
+                                  >
+                                    Copy
+                                  </button>
+                                </div>
+                                <p className="text-dark/80">
+                                  {bioVariants.fun_bio}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 );

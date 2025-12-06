@@ -13,7 +13,7 @@ from .views import (
     DraftPinView, DraftArchiveView, UseCaseTemplateListView,
     ApplyUseCaseTemplateView, MeProfileView, UsageSummaryView, PostingReminderListCreateView,
     AIPostingPlanView, PostingReminderDetailView, NotificationListView,
-    NotificationUnreadCountView, IdeaActionPlanView
+    NotificationUnreadCountView, IdeaActionPlanView, BioVariantsView
     )
 from .views_auth import PasswordResetRequestView, PasswordResetConfirmView, LoginView, EmailConfirmView, ChangePasswordView, NewsletterSendView
 
@@ -65,12 +65,14 @@ urlpatterns = [
     path("drafts/", DraftListCreateView.as_view(), name="draft-list-create"),
     path("drafts/<uuid:pk>/pin/", DraftPinView.as_view(), name="draft-pin"),
     path("drafts/<uuid:pk>/archive/", DraftArchiveView.as_view(), name="draft-archive"),
+    
     path("brand/persona/", BrandPersonaView.as_view(), name="brand-persona"),
     path(
         "brand/persona/sample-captions/",
         BrandSampleCaptionsView.as_view(),
         name="brand-sample-captions",
     ),
+    path("brand/bio-variants/", BioVariantsView.as_view(), name="brand-bio-variants"),
 
     path("auth/password-reset/", PasswordResetRequestView.as_view(), name="password-reset"),
     path("auth/password-reset/confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),

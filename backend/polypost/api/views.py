@@ -883,6 +883,7 @@ class PostingReminderListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
 class AIPostingPlanView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -1052,3 +1053,127 @@ class IdeaActionPlanView(views.APIView):
         plan = generate_idea_action_plan(profile, idea, platform=platform)
 
         return Response(plan, status=status.HTTP_200_OK)
+
+
+class BioVariantsView(views.APIView):
+    """
+    POST /api/brand/bio-variants/
+
+    Expects:
+    {
+      "base_bio": "string",
+      "platform": "instagram" | ... (optional)
+      "preferred_language": "en" | "fr" | ... (optional)
+      "niche": "fitness" (optional)
+      "target_audience": "Gen Z women" (optional)
+      "vibe": "Fun" (optional)
+      "tone": "Playful" (optional)
+      "creator_stage": "starter" | ... (optional)
+    }
+
+    Returns JSON object with:
+    {
+      "short_bio": "...",
+      "long_bio": "...",
+      "cta_bio": "...",
+      "fun_bio": "..."
+    }
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        base_bio = request.data.get("base_bio", "").strip()
+        if not base_bio:
+            return Response(
+                {"detail": "base_bio is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        platform = request.data.get("platform") or "instagram"
+        lang = request.data.get("preferred_language") or "en"
+        niche = request.data.get("niche") or ""
+        target = request.data.get("target_audience") or ""
+        vibe = request.data.get("vibe") or ""
+        tone = request.data.get("tone") or ""
+        stage = request.data.get("creator_stage") or ""
+
+        # Build a compact instruction string
+        context_bits = []
+        if niche:
+            context_bits.append(f"niche: {niche}")
+        if target:
+            context_bits.append(f"target audience: {target}")
+        if vibe:
+            context_bits.append(f"vibe: {vibe}")
+        if tone:
+            context_bits.append(f"tone: {tone}")
+        if stage:
+            context_bits.append(f"creator stage: {stage}")
+
+        context_str = "; ".join(context_bits) if context_bits else "no extra info"
+
+        try:
+            completion = client.chat.completions.create(
+                model="gpt-4.1-mini",
+                response_format={"type": "json_object"},
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a social media branding assistant. "
+                            "Given an existing bio and some creator context, "
+                            "you generate multiple variants of that bio.\n\n"
+                            "Return a *single* JSON object with these keys:\n"
+                            "- short_bio: a concise 1–2 line version.\n"
+                            "- long_bio: a 3–4 line version with more detail.\n"
+                            "- cta_bio: a version optimized around a strong call to action.\n"
+                            "- fun_bio: a playful, witty version.\n"
+                            "Do not wrap it in any additional text, only valid JSON."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Platform: {platform}\n"
+                            f"Language: {lang}\n"
+                            f"Context: {context_str}\n\n"
+                            f"Base bio:\n{base_bio}"
+                        ),
+                    },
+                ],
+            )
+
+            # ✅ Correct way with new OpenAI client:
+            raw_content = completion.choices[0].message.content
+
+            # Safety: sometimes models may accidentally return non-JSON; guard it
+            try:
+                parsed = json.loads(raw_content)
+            except json.JSONDecodeError:
+                # Try to nudge things: not ideal, but better than 500
+                return Response(
+                    {
+                        "detail": "Model did not return valid JSON.",
+                        "raw": raw_content,
+                    },
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+
+            # Only keep expected keys
+            result = {
+                "short_bio": parsed.get("short_bio", "").strip(),
+                "long_bio": parsed.get("long_bio", "").strip(),
+                "cta_bio": parsed.get("cta_bio", "").strip(),
+                "fun_bio": parsed.get("fun_bio", "").strip(),
+            }
+
+            return Response(result, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            # Whatever wrapper you had around this error was producing:
+            # "OpenAI error: 'ChatCompletionMessage' object is not subscriptable"
+            return Response(
+                {"detail": f"OpenAI error: {str(e)}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
