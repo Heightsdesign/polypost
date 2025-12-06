@@ -47,9 +47,11 @@ class CreatorProfile(models.Model):
     default_platform = models.CharField(
         max_length=50,
         choices=[
+            ("youtube", "Youtube"),
             ("tiktok", "TikTok"),
             ("instagram", "Instagram"),
             ("twitter", "Twitter/X"),
+            ("twitch", "Twitch"),
             ("onlyfans", "OnlyFans"),
             ("mym", "MYM Fans"),
             ("snapchat", "Snapchat"),
@@ -58,6 +60,22 @@ class CreatorProfile(models.Model):
             ],
         default="instagram",
     )
+     # NEW: list of platforms this creator actively uses
+    preferred_platforms = models.JSONField(default=list, blank=True)
+
+    def get_active_platforms(self):
+        """
+        Returns the list of platforms this creator is active on.
+        - If preferred_platforms is set -> use that
+        - Else fall back to default_platform
+        """
+        if self.preferred_platforms:
+            return self.preferred_platforms
+
+        if getattr(self, "default_platform", None):
+            return [self.default_platform]
+
+        return ["instagram"]
 
     # NEW fields:
     niche = models.CharField(
@@ -96,6 +114,9 @@ class CreatorProfile(models.Model):
     onboarding_completed = models.BooleanField(default=False)
     marketing_opt_in = models.BooleanField(default=False)
     notifications_enabled = models.BooleanField(default=False)
+
+    notify_email = models.BooleanField(default=True)
+    notify_inapp = models.BooleanField(default=True)
 
     CREATOR_STAGES = [
         ("starter", "Starter"),
@@ -169,11 +190,14 @@ class GeneratedCaption(models.Model):
 class ScheduledPost(models.Model):
     """Represents a future post or OF reminder."""
     PLATFORMS = [
+        ("youtube", "Youtube"),
         ("tiktok", "TikTok"),
         ("instagram", "Instagram"),
         ("twitter", "Twitter/X"),
+        ("twitch", "Twitch"),
         ("onlyfans", "OnlyFans"),
         ("mym", "MYM Fans"),
+        ("snapchat", "Snapchat"),
         ("general", "General"),
         ("entertainment", "Entertainment"),
         ]
@@ -208,11 +232,14 @@ class EngagementTip(models.Model):
 
 class GlobalTrend(models.Model):
     PLATFORM_CHOICES = [
+        ("youtube", "Youtube"),
         ("tiktok", "TikTok"),
         ("instagram", "Instagram"),
         ("twitter", "Twitter/X"),
+        ("twitch", "Twitch"),
         ("onlyfans", "OnlyFans"),
         ("mym", "MYM Fans"),
+        ("snapchat", "Snapchat"),
         ("general", "General"),
         ("entertainment", "Entertainment"),
     ]
@@ -332,6 +359,8 @@ class Draft(models.Model):
     suggested_caption_starter = models.TextField(blank=True)
     hook_used = models.CharField(max_length=255, blank=True)
     personal_twist = models.TextField(blank=True)
+    execution_plan = models.TextField(blank=True)
+
 
     # media fields (optional)
     media = models.ForeignKey(
@@ -367,11 +396,14 @@ class UseCaseTemplate(models.Model):
     """
 
     PLATFORM_CHOICES = [
-        ("instagram", "Instagram"),
+        ("youtube", "Youtube"),
         ("tiktok", "TikTok"),
-        ("twitter", "Twitter / X"),
+        ("instagram", "Instagram"),
+        ("twitter", "Twitter/X"),
+        ("twitch", "Twitch"),
         ("onlyfans", "OnlyFans"),
-        ("mym", "MYM"),
+        ("mym", "MYM Fans"),
+        ("snapchat", "Snapchat"),
         ("general", "General"),
     ]
 
@@ -385,6 +417,7 @@ class UseCaseTemplate(models.Model):
         choices=PLATFORM_CHOICES,
         default="general",
     )
+
 
     # CreatorProfile-style fields we’ll copy over
     vibe = models.CharField(max_length=100, blank=True, null=True)
@@ -516,6 +549,7 @@ class PostingReminder(models.Model):
 
     notify_email = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    notified = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["scheduled_at"]
@@ -534,3 +568,44 @@ class NewsletterBlast(models.Model):
 
     def __str__(self):
         return f"Newsletter: {self.subject} ({self.created_at.date()})"
+ 
+class Notification(models.Model):
+    """
+    Simple in-app notification (shown in bell + notifications page).
+    Typically created when we send a reminder email or other important event.
+    """
+    KIND_CHOICES = [
+        ("reminder", "Reminder"),
+        ("system", "System"),
+        ("usage", "Usage / limits"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+    )
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES, default="reminder")
+    message = models.TextField()
+
+    # Optional link to a reminder / scheduled post if you want
+    related_reminder = models.ForeignKey(
+        "PostingReminder",  # or just a string if model is below
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notifications",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user} – {self.kind} – {self.message[:40]}"
+
+    @property
+    def is_read(self) -> bool:
+        return self.read_at is not None

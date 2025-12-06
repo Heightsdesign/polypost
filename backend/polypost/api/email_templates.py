@@ -10,7 +10,7 @@ POSTLY_EMAIL_TEMPLATE = """<!DOCTYPE html>
             <tr>
               <td style="text-align:center; padding-bottom:18px;">
                 <div style="font-size:24px; font-weight:800; color:#6c4bf4;">
-                  Postly
+                  Polypost
                 </div>
               </td>
             </tr>
@@ -34,8 +34,8 @@ POSTLY_EMAIL_TEMPLATE = """<!DOCTYPE html>
             </tr>
             <tr>
               <td style="font-size:12px; color:#888; text-align:center; line-height:1.5;">
-                You're receiving this email because you have an account on Postly.<br/>
-                © {{YEAR}} Postly — All rights reserved.
+                You're receiving this email because you have an account on Polypost.<br/>
+                © {{YEAR}} Polypost — All rights reserved.
               </td>
             </tr>
           </table>

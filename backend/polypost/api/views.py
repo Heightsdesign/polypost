@@ -10,24 +10,28 @@ from rest_framework.views import APIView
 
 from django.conf import settings
 from django.utils import timezone as dj_timezone
+import zoneinfo
+
+
 from .models import (
     MediaUpload, GeneratedCaption, CreatorProfile, 
     GlobalTrend, PlannedPostSlot, UseCaseTemplate,
     PlatformTiming, PostPerformance, Plan, 
     Subscription, Draft, MediaUpload, GeneratedCaption,
-    MonthlyUsage, PostingReminder
+    MonthlyUsage, PostingReminder, Notification
     )
 
 from .serializers import (
     MediaUploadSerializer, RegisterSerializer, CaptionGenerateSerializer,
     GeneratedCaptionSerializer, PlannedPostSlotSerializer, CreatorProfileSerializer,
     PostPerformanceSerializer, DraftSerializer, UseCaseTemplateSerializer,
-    PostingReminderSerializer
+    PostingReminderSerializer, NotificationSerializer
     )
 
 from .utils import (
     build_caption_prompt, get_seasonal_hooks, get_floating_event_hooks,
-    get_trending_stub_hooks, get_trending_topics, get_trending_movies_from_tmdb, get_user_plan
+    get_trending_stub_hooks, get_trending_topics, get_trending_movies_from_tmdb,
+    get_user_plan, generate_idea_action_plan
     )
 
 from .utils import check_usage_allowed, increment_usage, send_postly_email
@@ -46,7 +50,8 @@ from django.conf import settings
 
 from openai import OpenAI
 from datetime import date, datetime, timedelta
-from .scheduling_utils import generate_posting_suggestions
+
+from .scheduling_utils import generate_posting_suggestions, generate_ai_posting_plan
 
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # or use decouple
@@ -74,9 +79,9 @@ class RegisterView(views.APIView):
         frontend_base = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
         confirm_url = f"{frontend_base}/confirm-email?uid={uid}&token={token}"
 
-        subject = "Confirm your Postly account"
+        subject = "Confirm your Polypost account"
         message = (
-            "Welcome to Postly!\n\n"
+            "Welcome to Polypost!\n\n"
             "Please confirm your email address by clicking the button below.\n\n"
             "If you didn't create this account, you can ignore this email."
         )
@@ -878,3 +883,172 @@ class PostingReminderListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+class AIPostingPlanView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        profile = CreatorProfile.objects.filter(user=user).first()
+
+        platform = request.data.get("platform", "instagram")
+
+        # We accept `days` for future tuning but don't use it yet.
+        try:
+            _days = int(request.data.get("days", 7))
+        except (TypeError, ValueError):
+            _days = 7  # noqa
+
+        # Let the helper decide posts_per_week (based on profile/goal)
+        plan_slots = generate_ai_posting_plan(
+            profile=profile,
+            platform=platform,
+            posts_per_week=None,
+        )
+
+        if not plan_slots:
+            # fallback safety: 4 posts/week
+            plan_slots = generate_ai_posting_plan(
+                profile=profile,
+                platform=platform,
+                posts_per_week=4,
+            )
+
+        # user timezone (for interpreting naive datetimes)
+        tz_name = getattr(profile, "timezone", None) or "UTC"
+        try:
+            user_tz = zoneinfo.ZoneInfo(tz_name)
+        except Exception:
+            user_tz = zoneinfo.ZoneInfo("UTC")
+
+        created_slots = []
+
+        for slot in plan_slots:
+            dt_str = slot.get("scheduled_at") or slot.get("datetime")
+            if not dt_str:
+                continue
+
+            dt_local = parse_datetime(dt_str)
+            if dt_local is None:
+                continue
+
+            if dt_local.tzinfo is None:
+                dt_local = dt_local.replace(tzinfo=user_tz)
+
+            dt_utc = dt_local.astimezone(zoneinfo.ZoneInfo("UTC"))
+
+            if dt_utc < timezone.now():
+                continue
+
+            plat = slot.get("platform", platform)
+            title = slot.get("title") or "Planned post"
+            notify_flag = bool(slot.get("notify", True))
+
+            # Content-type / note
+            note_text = slot.get("note") or title or "Planned post"
+
+            planned_slot, _ = PlannedPostSlot.objects.get_or_create(
+                user=user,
+                platform=plat,
+                scheduled_at=dt_utc,
+                defaults={
+                    "title": title,
+                    "notify": notify_flag,
+                },
+            )
+
+            # Create matching calendar reminder
+            reminder, _ = PostingReminder.objects.get_or_create(
+                user=user,
+                scheduled_at=planned_slot.scheduled_at,
+                defaults={
+                    "platform": planned_slot.platform,
+                    "note": note_text,
+                    "notify_email": planned_slot.notify,
+                },
+            )
+
+            created_slots.append(planned_slot)
+
+        data = PlannedPostSlotSerializer(created_slots, many=True).data
+
+        # For debugging/UX, return which platforms were used
+        used_platforms = sorted({s["platform"] for s in plan_slots}) or [platform]
+
+        return Response(
+            {
+                "platforms": used_platforms,
+                "created_count": len(created_slots),
+                "slots": data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+    
+class PostingReminderDetailView(views.APIView):
+    """
+    Allow the current user to delete a reminder.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, reminder_id, *args, **kwargs):
+        try:
+            reminder = PostingReminder.objects.get(
+                id=reminder_id, user=request.user
+            )
+        except PostingReminder.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        reminder.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+
+class NotificationUnreadCountView(views.APIView):
+    """
+    Returns the number of unread notifications for the current user.
+    Shape matches the navbar expectation: { "unread": <int> }
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        count = Notification.objects.filter(
+            user=request.user,
+            read_at__isnull=True,
+        ).count()
+        return Response({"unread": count}, status=status.HTTP_200_OK)
+
+
+class NotificationListView(views.APIView):
+    """
+    Simple list of notifications for the current user.
+    You can later add pagination / mark-as-read etc.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        qs = Notification.objects.filter(user=request.user).order_by("-created_at")[:50]
+        serializer = NotificationSerializer(qs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class IdeaActionPlanView(views.APIView):
+    """
+    Turn a generated idea into a concrete execution plan.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        profile = CreatorProfile.objects.filter(user=user).first()
+
+        idea = request.data.get("idea") or {}
+        platform = request.data.get("platform", "instagram")
+
+        if not isinstance(idea, dict) or not idea:
+            return Response(
+                {"detail": "idea field (object) is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        plan = generate_idea_action_plan(profile, idea, platform=platform)
+
+        return Response(plan, status=status.HTTP_200_OK)

@@ -21,6 +21,7 @@ type Draft = {
   media_url?: string | null;
   // Optional extras if you later expose them from the backend
   caption_text?: string | null;
+  execution_plan?: string | null;
 };
 
 type CaptionPayload = {
@@ -111,6 +112,152 @@ export default function Gallery() {
     setCaptionObj(null);
     setModalCaption("");
   }
+
+    // Turn execution_plan JSON into readable text
+  function renderExecutionPlan(raw?: string | null) {
+    if (!raw) return null;
+
+    const toText = (plan: any): string => {
+      if (!plan) return "";
+      if (typeof plan === "string") return plan;
+
+      // If wrapped
+      if (plan.plan || plan.action_plan || plan.text) {
+        const inner = plan.plan || plan.action_plan || plan.text;
+        if (typeof inner === "string") return inner;
+        plan = inner;
+      }
+
+      const parts: string[] = [];
+
+      // Specific shape you showed
+      if (plan.idea_title) {
+        parts.push(plan.idea_title);
+      }
+
+      if (plan.concept_summary) {
+        parts.push(plan.concept_summary);
+      }
+
+      if (Array.isArray(plan.sections) && plan.sections.length > 0) {
+        const sectionLines: string[] = [];
+
+        plan.sections.forEach((sec: any, sIdx: number) => {
+          if (!sec) return;
+          const title = sec.title || `Part ${sIdx + 1}`;
+          sectionLines.push(`${title}:`);
+
+          if (Array.isArray(sec.steps) && sec.steps.length > 0) {
+            sec.steps.forEach((step: any, i: number) => {
+              const text =
+                typeof step === "string"
+                  ? step
+                  : step.text || step.description || "";
+              if (text) {
+                sectionLines.push(`  ${i + 1}. ${text}`);
+              }
+            });
+          }
+
+          sectionLines.push(""); // blank line between sections
+        });
+
+        parts.push(sectionLines.join("\n"));
+      }
+
+      // Generic fallbacks
+      if (plan.overview) {
+        parts.push(plan.overview);
+      }
+
+      if (Array.isArray(plan.steps) && plan.steps.length > 0) {
+        parts.push(
+          "Steps:\n" +
+            plan.steps
+              .map((s: any, i: number) => {
+                if (typeof s === "string") return `${i + 1}. ${s}`;
+                const title = s.title || `Step ${i + 1}`;
+                const detail = s.detail || s.description || "";
+                return `${i + 1}. ${title}${
+                  detail ? ` – ${detail}` : ""
+                }`;
+              })
+              .join("\n")
+        );
+      }
+
+      if (Array.isArray(plan.checklist) && plan.checklist.length > 0) {
+        parts.push(
+          "Checklist:\n" +
+            plan.checklist
+              .map((c: any) => {
+                const text = typeof c === "string" ? c : c.text || "";
+                return text ? `• ${text}` : "";
+              })
+              .filter(Boolean)
+              .join("\n")
+        );
+      }
+
+      if (plan.hook) parts.push(`Hook: ${plan.hook}`);
+
+      if (plan.caption_template || plan.caption_prompt) {
+        parts.push(
+          `Caption starter: ${plan.caption_template || plan.caption_prompt}`
+        );
+      }
+
+      if (Array.isArray(plan.tags) && plan.tags.length > 0) {
+        parts.push("Tags: " + plan.tags.join(", "));
+      }
+
+      if (plan.timeframe) {
+        parts.push(`Timeframe: ${plan.timeframe}`);
+      }
+
+      if (!parts.length) {
+        try {
+          return JSON.stringify(plan, null, 2);
+        } catch {
+          return "";
+        }
+      }
+
+      return parts.join("\n\n");
+    };
+
+    let text = "";
+
+    try {
+      const parsed = JSON.parse(raw);
+      text = toText(parsed) || raw;
+    } catch {
+      text = raw;
+    }
+
+    if (!text.trim()) return null;
+
+    return (
+      <div className="mt-4 text-[0.85rem] text-dark/85 whitespace-pre-line leading-relaxed">
+        <span className="block text-[0.9rem] font-semibold mb-2 text-purple-700">
+          Action plan
+        </span>
+        <div
+          className="space-y-3"
+          dangerouslySetInnerHTML={{
+            __html: text
+              // bold section subtitles like "Preparation:"
+              .replace(
+                /^([A-Za-z ].+?):$/gm,
+                "<strong>$1:</strong>"
+              )
+              .replace(/\n/g, "<br>"),
+          }}
+        />
+      </div>
+    );
+  }
+
 
   // ---------- actions: pin / unpin / archive ----------
 
@@ -573,6 +720,7 @@ export default function Gallery() {
                         placeholder="How you want to personalize this idea"
                       />
                     </div>
+                    {renderExecutionPlan(selectedDraft.execution_plan)}
                   </div>
                 )}
 

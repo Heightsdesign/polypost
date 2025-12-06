@@ -1,9 +1,11 @@
 
 # api/utils.py
-from datetime import date
 import os
 import requests
+import json
 
+from datetime import date
+from openai import OpenAI
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
@@ -12,6 +14,7 @@ from django.utils.timezone import now
 from .email_templates import POSTLY_EMAIL_TEMPLATE
 from .models import MonthlyUsage, Subscription, Plan
 
+client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 
 def render_postly_email_html(title: str, message: str, button_text: str, button_url: str) -> str:
@@ -38,7 +41,7 @@ def send_postly_email(
     fail_silently: bool = True,
 ):
     """
-    Reusable helper to send a branded Postly HTML email with a button,
+    Reusable helper to send a branded Polypost HTML email with a button,
     plus a plain-text fallback.
     """
     from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@polypost-platform.com")
@@ -364,3 +367,176 @@ def user_has_active_subscription(user):
     except Subscription.DoesNotExist:
         return False
     return sub.is_active()
+
+
+def build_brand_personas(niche: str, target_audience: str, goals: str, comfort_level: str, user=None):
+    """
+    Returns a dict: { "personas": [ { ... }, { ... }, { ... } ] }
+    Each persona has: persona_name, brand_summary, recommended_vibe, recommended_tone,
+                      niche, target_audience, content_pillars, brand_bio
+    """
+    # Basic safety defaults
+    niche = niche or "general creator"
+    target_audience = target_audience or "social media followers"
+    goals = goals or "grow audience and increase engagement"
+    comfort_level = comfort_level or "comfortable being a bit bold but still authentic"
+
+    prompt_lines = [
+        "You are a brand strategist for social media creators.",
+        "Based on the details below, generate EXACTLY 3 different brand persona options.",
+        "",
+        f"Niche: {niche}",
+        f"Target audience: {target_audience}",
+        f"Goals: {goals}",
+        f"Comfort level on camera / social: {comfort_level}",
+        "",
+        "For each persona, include:",
+        "- persona_name (short, catchy, like 'Bold Big Sis' or 'Cozy Expert')",
+        "- brand_summary (2–3 sentences explaining vibe & value)",
+        "- recommended_vibe (must match one of: Fun, Chill, Bold, Educational, Luxury, Cozy, High-energy, Mysterious, Wholesome)",
+        "- recommended_tone (must match one of: Casual, Professional, Playful, Flirty, Inspirational, Sarcastic, Empathetic, Confident)",
+        "- niche (reuse or refine the niche)",
+        "- target_audience (refined audience description)",
+        "- content_pillars (array of 3–5 content topics)",
+        "- brand_bio (1–2 sentence social bio in first person)",
+        "",
+        "Return ONLY JSON in this shape (no markdown, no commentary):",
+        "{",
+        '  "personas": [',
+        "    {",
+        '      "persona_name": "...",',
+        '      "brand_summary": "...",',
+        '      "recommended_vibe": "...",',
+        '      "recommended_tone": "...",',
+        '      "niche": "...",',
+        '      "target_audience": "...",',
+        '      "content_pillars": ["...", "..."],',
+        '      "brand_bio": "..."',
+        "    },",
+        "    { ... },",
+        "    { ... }",
+        "  ]",
+        "}",
+    ]
+
+    prompt = "\n".join(prompt_lines)
+
+    completion = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You generate brand personas for creators."},
+            {"role": "user", "content": prompt},
+        ],
+        max_tokens=900,
+    )
+    raw = completion.choices[0].message.content.strip()
+
+    try:
+        data = json.loads(raw)
+    except Exception:
+        # In worst case, wrap into a single fallback persona
+        data = {
+            "personas": [
+                {
+                    "persona_name": "Default Creator",
+                    "brand_summary": raw[:300],
+                    "recommended_vibe": "Fun",
+                    "recommended_tone": "Casual",
+                    "niche": niche,
+                    "target_audience": target_audience,
+                    "content_pillars": [],
+                    "brand_bio": "",
+                }
+            ]
+        }
+
+    # Ensure we always return a "personas" list
+    if not isinstance(data, dict) or "personas" not in data:
+        data = {"personas": data if isinstance(data, list) else [data]}
+
+    return data
+
+# api/utils.py
+from django.conf import settings
+from openai import OpenAI
+
+client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+
+def generate_idea_action_plan(profile, idea: dict, platform: str = "instagram") -> dict:
+    """
+    Given an idea dict like:
+      {
+        "title": "...",
+        "description": "...",
+        "suggested_caption_starter": "...",
+        "personal_twist": "..."
+      }
+
+    return a JSON-ready dict describing an execution plan.
+    """
+    user_niche = getattr(profile, "niche", "") if profile else ""
+    user_stage = getattr(profile, "creator_stage", "") if profile else ""
+    target_audience = getattr(profile, "target_audience", "") if profile else ""
+
+    system_msg = (
+        "You are an expert content coach for online creators. "
+        "You turn abstract ideas into very concrete, step-by-step action plans. "
+        "Always respond as a JSON object with short, practical steps. "
+        "No emojis, no hashtags, no long essays."
+    )
+
+    user_msg = {
+        "role": "user",
+        "content": (
+            "Generate a practical execution plan for this content idea.\n\n"
+            f"Platform: {platform}\n"
+            f"Niche: {user_niche or 'not specified'}\n"
+            f"Creator stage: {user_stage or 'not specified'}\n"
+            f"Target audience: {target_audience or 'not specified'}\n\n"
+            "Idea JSON:\n"
+            f"{idea}\n\n"
+            "Return JSON with this shape:\n"
+            "{\n"
+            '  \"idea_title\": string,\n'
+            '  \"concept_summary\": string,\n'
+            '  \"sections\": [\n'
+            '    {\"title\": string, \"steps\": [string, ...]},\n'
+            '    ...\n'
+            "  ],\n"
+            '  \"extra_tips\": [string, ...]\n'
+            "}\n"
+        ),
+    }
+
+    resp = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": system_msg},
+            user_msg,
+        ],
+        temperature=0.7,
+    )
+
+    content = resp.choices[0].message.content
+    try:
+        import json
+
+        data = json.loads(content)
+    except Exception:
+        # very defensive fallback
+        data = {
+            "idea_title": idea.get("title") or "Content idea",
+            "concept_summary": "Execution steps could not be parsed; show raw text.",
+            "sections": [
+                {
+                    "title": "Plan",
+                    "steps": [content],
+                }
+            ],
+            "extra_tips": [],
+        }
+
+    return data
+

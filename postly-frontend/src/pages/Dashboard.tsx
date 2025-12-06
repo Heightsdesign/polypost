@@ -18,7 +18,6 @@ import BlobRedLarge from "../assets/blobs/blob-5.png";
 import SchedulerWidget, { type Reminder } from "../components/SchedulerWidget";
 
 
-
 // simple modal
 function Modal({
   open,
@@ -35,9 +34,15 @@ function Modal({
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-sm px-4">
       <div
-        className="relative w-full max-w-xl rounded-3xl bg-white/95 p-5 md:p-6 shadow-2xl border border-purple/10"
+        className="
+          relative w-full max-w-xl max-h-[85vh]
+          rounded-3xl bg-white/95 p-5 md:p-6
+          shadow-2xl border border-purple/10
+          flex flex-col
+        "
       >
-        <div className="flex items-center justify-between gap-3 mb-3">
+        {/* header */}
+        <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
           <h2 className="text-lg font-semibold text-dark">{title}</h2>
           <button
             onClick={onClose}
@@ -47,11 +52,16 @@ function Modal({
             ✕
           </button>
         </div>
-        <div className="text-sm text-dark/80">{children}</div>
+
+        {/* scrollable body */}
+        <div className="text-sm text-dark/80 overflow-y-auto pr-1 flex-1">
+          {children}
+        </div>
       </div>
     </div>
   );
 }
+
 
 type UsageSummary = {
   ideas_used: number;
@@ -68,6 +78,10 @@ export default function Dashboard() {
   // ideas
   const [ideas, setIdeas] = useState<any[]>([]);
   const [ideasLoading, setIdeasLoading] = useState(false);
+
+    // idea action plans
+  const [ideaPlans, setIdeaPlans] = useState<Record<number, any>>({});
+  const [planLoadingIdx, setPlanLoadingIdx] = useState<number | null>(null);
 
   // upload
   const [file, setFile] = useState<File | null>(null);
@@ -190,6 +204,15 @@ export default function Dashboard() {
     }
   }
 
+  async function loadReminders() {
+    try {
+      const res = await api.get("/schedule/reminders/");
+      setReminders(res.data || []);
+    } catch (err) {
+      console.error("Could not refresh reminders", err);
+    }
+  }
+
   async function handleSaveIdeaAsDraft(idea: any, idx: number) {
     try {
       setSavingIdeaId(idx);
@@ -198,6 +221,7 @@ export default function Dashboard() {
         title: idea.title || "",
         description: idea.description || "",
         suggested_caption_starter: idea.suggested_caption_starter || "",
+        execution_plan: ideaPlans[idx] || "",
         hook_used: idea.hook_used || "",
         personal_twist: idea.personal_twist || "",
       });
@@ -208,6 +232,39 @@ export default function Dashboard() {
       setSavingIdeaId(null);
     }
   }
+
+  async function handleGenerateActionPlan(idea: any, idx: number) {
+    setPlanLoadingIdx(idx);
+
+    try {
+      const res = await api.post("/ideas/action-plan/", {
+        idea: {
+          title: idea.title || "",
+          description: idea.description || "",
+          platform: "instagram", // or use user's default platform if you have it
+        },
+      });
+
+      // backend might call it "plan" or "action_plan" or "text"
+      const text =
+        res.data.plan ||
+        res.data.action_plan ||
+        res.data.text ||
+        JSON.stringify(res.data, null, 2);
+
+      setIdeaPlans((prev) => ({
+        ...prev,
+        [idx]: text,
+      }));
+    } catch (err) {
+      console.error("Error generating action plan", err);
+    } finally {
+      setPlanLoadingIdx(null);
+    }
+  }
+
+
+
 
   async function handleSaveMediaDraft() {
     if (!uploadId || !captionObj) {
@@ -428,6 +485,7 @@ export default function Dashboard() {
               reminders={reminders}
               setReminders={setReminders}
               drafts={recentDrafts}
+              loadReminders={loadReminders}
             />
 
             {/* reviews */}
@@ -560,19 +618,22 @@ export default function Dashboard() {
                 className="rounded-2xl border border-purple/10 bg-purple/5 px-3 py-3 text-xs md:text-sm"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="font-semibold text-dark mb-1">
+                  <div className="space-y-1">
+                    <h3 className="font-semibold text-dark">
                       {idea.title || "Idea"}
                     </h3>
+
                     {idea.description && (
-                      <p className="text-dark/75 mb-1">{idea.description}</p>
+                      <p className="text-dark/75">{idea.description}</p>
                     )}
+
                     {idea.suggested_caption_starter && (
                       <p className="text-[0.75rem] text-dark/70">
                         <span className="font-semibold">Caption start:</span>{" "}
                         {idea.suggested_caption_starter}
                       </p>
                     )}
+
                     {idea.personal_twist && (
                       <p className="text-[0.75rem] text-dark/70">
                         <span className="font-semibold">Twist:</span>{" "}
@@ -580,6 +641,7 @@ export default function Dashboard() {
                       </p>
                     )}
                   </div>
+
                   <button
                     type="button"
                     onClick={() => handleSaveIdeaAsDraft(idea, idx)}
@@ -589,8 +651,188 @@ export default function Dashboard() {
                     {savingIdeaId === idx ? "Saving..." : "Save draft"}
                   </button>
                 </div>
+
+                {/* Actions under the idea */}
+                <div className="mt-3 flex flex-wrap gap-2 items-center">
+                  <button
+                    type="button"
+                    onClick={() => handleGenerateActionPlan(idea, idx)}
+                    disabled={planLoadingIdx === idx}
+                    className="inline-flex items-center justify-center rounded-2xl bg-purple/10 px-3 py-1.5 text-[0.7rem] font-semibold text-purple hover:bg-purple/20 disabled:opacity-60 transition-all"
+                  >
+                    {planLoadingIdx === idx ? "Generating plan…" : "Generate action plan"}
+                  </button>
+
+                  {ideaPlans[idx] && (
+                    <span className="text-[0.7rem] text-green-700">
+                      ✓ Action plan ready
+                    </span>
+                  )}
+                </div>
+
+                {/* Loading / error */}
+                {planLoadingIdx === idx && (
+                  <p className="mt-1 text-[0.7rem] text-dark/60">
+                    We’re breaking this idea into concrete steps…
+                  </p>
+                )}
+
+
+                {/* Simple action plan inline */}
+                {ideaPlans[idx] && (() => {
+                  const raw = ideaPlans[idx];
+
+                  // Helper to turn a plan object into readable text
+                  const toText = (plan: any): string => {
+                    if (!plan) return "";
+
+                    // If it's already a string, just return it
+                    if (typeof plan === "string") return plan;
+
+                    // If backend wrapped the real plan inside these fields
+                    if (plan.plan || plan.action_plan || plan.text) {
+                      const inner = plan.plan || plan.action_plan || plan.text;
+                      if (typeof inner === "string") return inner;
+                      plan = inner;
+                    }
+
+                    const parts: string[] = [];
+
+                    // ✅ Specific handling for your current shape
+                    if (plan.idea_title) {
+                      parts.push(plan.idea_title);
+                    }
+
+                    if (plan.concept_summary) {
+                      parts.push(plan.concept_summary);
+                    }
+
+                    if (Array.isArray(plan.sections) && plan.sections.length > 0) {
+                      const sectionLines: string[] = [];
+
+                      plan.sections.forEach((sec: any, sIdx: number) => {
+                        if (!sec) return;
+                        const title = sec.title || `Part ${sIdx + 1}`;
+                        sectionLines.push(`${title}:`);
+
+                        if (Array.isArray(sec.steps) && sec.steps.length > 0) {
+                          sec.steps.forEach((step: any, i: number) => {
+                            const text = typeof step === "string" ? step : step.text || step.description || "";
+                            if (text) {
+                              sectionLines.push(`  ${i + 1}. ${text}`);
+                            }
+                          });
+                        }
+
+                        sectionLines.push(""); // blank line between sections
+                      });
+
+                      parts.push(sectionLines.join("\n"));
+                    }
+
+                    // Generic fallback fields (works for other shapes too)
+                    if (plan.overview) {
+                      parts.push(plan.overview);
+                    }
+
+                    if (Array.isArray(plan.steps) && plan.steps.length > 0) {
+                      parts.push(
+                        "Steps:\n" +
+                          plan.steps
+                            .map((s: any, i: number) => {
+                              if (typeof s === "string") return `${i + 1}. ${s}`;
+                              const title = s.title || `Step ${i + 1}`;
+                              const detail = s.detail || s.description || "";
+                              return `${i + 1}. ${title}${detail ? ` – ${detail}` : ""}`;
+                            })
+                            .join("\n")
+                      );
+                    }
+
+                    if (Array.isArray(plan.checklist) && plan.checklist.length > 0) {
+                      parts.push(
+                        "Checklist:\n" +
+                          plan.checklist
+                            .map((c: any) => {
+                              const text = typeof c === "string" ? c : c.text || "";
+                              return text ? `• ${text}` : "";
+                            })
+                            .filter(Boolean)
+                            .join("\n")
+                      );
+                    }
+
+                    if (plan.hook) {
+                      parts.push(`Hook: ${plan.hook}`);
+                    }
+
+                    if (plan.caption_template || plan.caption_prompt) {
+                      parts.push(
+                        `Caption starter: ${plan.caption_template || plan.caption_prompt}`
+                      );
+                    }
+
+                    if (Array.isArray(plan.tags) && plan.tags.length > 0) {
+                      parts.push("Tags: " + plan.tags.join(", "));
+                    }
+
+                    if (plan.timeframe) {
+                      parts.push(`Timeframe: ${plan.timeframe}`);
+                    }
+
+                    // If we still have nothing, last resort: JSON
+                    if (!parts.length) {
+                      try {
+                        return JSON.stringify(plan, null, 2);
+                      } catch {
+                        return "";
+                      }
+                    }
+
+                    return parts.join("\n\n");
+                  };
+
+
+                  let text = "";
+
+                  if (typeof raw === "string") {
+                    // Try to parse JSON, otherwise just use the string
+                    try {
+                      const parsed = JSON.parse(raw);
+                      text = toText(parsed) || raw;
+                    } catch {
+                      text = raw;
+                    }
+                  } else {
+                    text = toText(raw);
+                  }
+
+                  if (!text) return null;
+
+                  return (
+                   <div className="mt-4 text-[0.85rem] text-dark/85 whitespace-pre-line leading-relaxed">
+                    <span className="block text-[0.9rem] font-semibold mb-2 text-purple-700">
+                      Action plan
+                    </span>
+
+                    <div
+                      className="space-y-3"
+                      dangerouslySetInnerHTML={{
+                        __html: text
+                          .replace(/^([A-Za-z ].+?):$/gm, "<strong>$1:</strong>") // bold section subtitles
+                          .replace(/\n/g, "<br>") // keep line breaks
+                      }}
+                    />
+                  </div>
+
+                  );
+                })()}
+
+                
+
               </div>
             ))}
+
           </div>
         </Modal>
 

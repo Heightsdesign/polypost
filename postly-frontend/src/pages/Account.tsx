@@ -1,6 +1,17 @@
 import { useState, useEffect } from "react";
 import api from "../api";
 
+ const ALL_PLATFORMS = [
+    { value: "instagram", label: "Instagram" },
+    { value: "tiktok", label: "TikTok" },
+    { value: "twitter", label: "Twitter / X" },
+    { value: "youtube", label: "YouTube" },
+    { value: "twitch", label: "Twitch" },
+    { value: "onlyfans", label: "OnlyFans" },
+    { value: "mym", label: "MYM Fans" },
+    { value: "snapchat", label: "Snapchat" },
+  ];
+
 export default function Account() {
   const [loading, setLoading] = useState(false);
   const [savingPrefs, setSavingPrefs] = useState(false);
@@ -37,6 +48,11 @@ export default function Account() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
+  const [preferredPlatforms, setPreferredPlatforms] = useState<string[]>([]);
+
+ 
+
+
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -67,6 +83,14 @@ export default function Account() {
             ? d.marketing_opt_in
             : false
         );
+        setPreferredPlatforms(
+          Array.isArray(d.preferred_platforms) && d.preferred_platforms.length
+            ? d.preferred_platforms
+            : d.default_platform
+            ? [d.default_platform]
+            : ["instagram"]
+        );
+
       } catch (err) {
         setError("Could not load preferences.");
       } finally {
@@ -135,6 +159,7 @@ export default function Account() {
         niche,
         target_audience: targetAudience,
         default_platform: defaultPlatform,
+        preferred_platforms: preferredPlatforms,
         timezone,
         notifications_enabled: notifyEmail,
         marketing_opt_in: notifyPush,
@@ -418,6 +443,35 @@ export default function Account() {
                 <option value="mym">MYM Fans</option>
                 
               </select>
+            </div>
+            <div style={fieldStyle}>
+              <label>Active platforms</label>
+              <div className="flex flex-wrap gap-2">
+                {ALL_PLATFORMS.map((p) => {
+                  const checked = preferredPlatforms.includes(p.value);
+                  return (
+                    <button
+                      key={p.value}
+                      type="button"
+                      onClick={() => {
+                        setPreferredPlatforms((prev) =>
+                          checked
+                            ? prev.filter((val) => val !== p.value)
+                            : [...prev, p.value]
+                        );
+                      }}
+                      className={[
+                        "px-3 py-1.5 rounded-2xl text-xs font-semibold border transition-all",
+                        checked
+                          ? "bg-purple text-white border-purple shadow-sm"
+                          : "bg-white text-dark/80 border-purple/20 hover:border-purple/50",
+                      ].join(" ")}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div style={fieldStyle}>
               <label>Timezone</label>

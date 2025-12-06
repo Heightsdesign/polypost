@@ -49,9 +49,9 @@ class PasswordResetRequestView(APIView):
         frontend_base = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
         reset_url = f"{frontend_base}/reset-password?uid={uid}&token={token}"
 
-        subject = "Reset your Postly password"
+        subject = "Reset your Polypost password"
         message = (
-            "You requested a password reset for your Postly account.\n\n"
+            "You requested a password reset for your Polypost account.\n\n"
             "Click the button below to set a new password.\n\n"
             "If you didn’t request this, you can safely ignore this email."
         )
@@ -157,9 +157,9 @@ class EmailConfirmView(APIView):
         frontend_base = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
         dashboard_url = f"{frontend_base}/dashboard"
 
-        welcome_subject = "Welcome to Postly! 🎉"
+        welcome_subject = "Welcome to Polypost! 🎉"
         welcome_message = (
-            "Your email has been confirmed and your Postly account is ready to use!<br><br>"
+            "Your email has been confirmed and your Polypost account is ready to use!<br><br>"
             "You're all set — start generating ideas, captions, and planning your content.\n\n"
             "Click below to access your dashboard:"
         )

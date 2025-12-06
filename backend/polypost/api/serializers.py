@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import MediaUpload, GeneratedCaption, PlannedPostSlot, PostPerformance, Draft, MediaUpload, GeneratedCaption, CreatorProfile, UseCaseTemplate, PostingReminder
+from .models import MediaUpload, GeneratedCaption, PlannedPostSlot, PostPerformance, Draft, MediaUpload, GeneratedCaption, CreatorProfile, UseCaseTemplate, PostingReminder, Notification
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -75,7 +75,10 @@ class CreatorProfileSerializer(serializers.ModelSerializer):
             "always_add_emojis",
             "always_add_cta",
             "default_platform",
+            "preferred_platforms",
             "notifications_enabled",
+            "notify_email",
+            "notify_inapp",
             "marketing_opt_in",
             "creator_stage",
             "avatar",
@@ -170,6 +173,7 @@ class DraftSerializer(serializers.ModelSerializer):
             "suggested_caption_starter",
             "hook_used",
             "personal_twist",
+            "execution_plan",
             "pinned",
             "archived",
             "created_at",
@@ -242,3 +246,20 @@ class BrandPersonaRequestSerializer(serializers.Serializer):
         allow_blank=True,
         help_text="How comfortable they are on camera / being explicit / being goofy, etc.",
     )
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    is_read = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Notification
+        fields = (
+            "id",
+            "kind",
+            "message",
+            "created_at",
+            "is_read",
+        )
+
+    def get_is_read(self, obj):
+        return obj.read_at is not None

@@ -3,7 +3,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from celery import shared_task
-from .models import GlobalTrend, PlatformTiming, PlannedPostSlot, Draft
+from .models import GlobalTrend, PlatformTiming, PlannedPostSlot, Draft, CreatorProfile, Notification, PostingReminder
 from .external_sources import (
     get_tmdb_trending,
     get_tiktok_trends_from_apify,
@@ -204,3 +204,60 @@ def send_newsletter_email_task(blast_id: int, subject: str, body_text: str, html
     blast.sent_at = timezone.now()
     blast.recipients_count = count
     blast.save()
+
+
+@shared_task
+def check_upcoming_posts():
+    now = timezone.now()
+    one_hour_from_now = now + timedelta(hours=1)
+
+    reminders = PostingReminder.objects.filter(
+        notified=False,                     # <-- REQUIRED FLAG
+        scheduled_at__lte=one_hour_from_now,
+        scheduled_at__gte=now
+    )
+
+    for reminder in reminders:
+        user = reminder.user
+        profile = CreatorProfile.objects.filter(user=user).first()
+        if not profile:
+            continue
+
+        msg = f"Reminder: Your {reminder.platform.capitalize()} post is scheduled in 1 hour at {reminder.scheduled_at}."
+
+        # ----- EMAIL NOTIFICATION -----
+        if profile.notify_email:
+            send_postly_email(
+                to=user.email,
+                subject="⏰ Posting Reminder",
+                template_name="posting_reminder.html",
+                context={
+                    "username": user.username,
+                    "platform": reminder.platform,
+                    "scheduled_at": reminder.scheduled_at,
+                    "note": reminder.note,
+                }
+            )
+
+        # ----- IN-APP NOTIFICATION -----
+        if profile.notify_inapp:
+            Notification.objects.create(
+                user=user,
+                message=msg,
+                url="/dashboard#scheduler"
+            )
+        
+        Notification.objects.create(
+            user=reminder.user,
+            kind="reminder",
+            message=f"Upcoming {reminder.platform} post at {reminder.scheduled_at:%Y-%m-%d %H:%M}: {reminder.note}",
+            related_reminder=reminder,
+        )
+
+        
+        # always create an in-app notification
+       
+        # Prevent duplicate notifications
+        reminder.notified = True
+        reminder.save()
+

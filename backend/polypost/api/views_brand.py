@@ -1,19 +1,20 @@
-import os
+# api/views_brand.py
 import json
-from openai import OpenAI
-
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions, status
-from django.contrib.auth import get_user_model
-from .models import CreatorProfile
+
 from .serializers import BrandPersonaRequestSerializer
+from .utils import build_brand_personas 
 
+from rest_framework import serializers
+from .utils import client
 
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 class BrandPersonaView(APIView):
+    """
+    Public endpoint: returns 3 persona options.
+    """
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
@@ -21,49 +22,72 @@ class BrandPersonaView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        user = request.user if request.user.is_authenticated else None
-        profile = CreatorProfile.objects.filter(user=user).first()
+        personas_data = build_brand_personas(
+            niche=data.get("niche", ""),
+            target_audience=data.get("target_audience", ""),
+            goals=data.get("goals", ""),
+            comfort_level=data.get("comfort_level", ""),
+            user=request.user if request.user.is_authenticated else None,
+        )
 
-        # Build a compact prompt using what we know + user answers
-        lines = [
-            "You are a brand strategist helping a social media creator define their brand personality.",
-            "Return ONLY JSON, no extra text, no markdown.",
-            "JSON keys: persona_name, brand_summary, recommended_vibe, recommended_tone, content_pillars, brand_bio, do_more_of, avoid.",
+        return Response(personas_data, status=status.HTTP_200_OK)
+
+
+class BrandSampleCaptionsSerializer(serializers.Serializer):
+    persona_name = serializers.CharField(required=False, allow_blank=True)
+    recommended_vibe = serializers.CharField(required=False, allow_blank=True)
+    recommended_tone = serializers.CharField(required=False, allow_blank=True)
+    niche = serializers.CharField(required=False, allow_blank=True)
+    target_audience = serializers.CharField(required=False, allow_blank=True)
+    platform = serializers.CharField(required=False, allow_blank=True)  # e.g. instagram
+
+
+class BrandSampleCaptionsView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = BrandSampleCaptionsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        platform = data.get("platform") or "instagram"
+
+        prompt_lines = [
+            "You write short social media posts that match a brand persona.",
             "",
-            f"Creator stage: {data.get('creator_stage') or getattr(profile, 'creator_stage', '')}",
-            f"Platforms: {', '.join(data.get('platforms') or [getattr(profile, 'default_platform', 'instagram')])}",
-            f"Niche: {data.get('niche') or getattr(profile, 'niche', '')}",
-            f"Target audience: {data.get('target_audience') or getattr(profile, 'target_audience', '')}",
-            f"Goals: {data.get('goals') or 'grow audience & earn more from content'}",
-            f"Comfort level: {data.get('comfort_level') or 'average'}",
+            f"Persona name: {data.get('persona_name') or 'Creator'}",
+            f"Vibe: {data.get('recommended_vibe') or 'Fun'}",
+            f"Tone: {data.get('recommended_tone') or 'Casual'}",
+            f"Niche: {data.get('niche') or 'general creator'}",
+            f"Target audience: {data.get('target_audience') or 'followers'}",
+            f"Platform: {platform}",
+            "",
+            "Generate EXACTLY 3 short caption ideas (1–2 sentences each).",
+            "They should feel aligned with the vibe & tone and speak to the audience.",
+            "",
+            "Return ONLY JSON in this shape:",
+            '{ "captions": ["...", "...", "..."] }',
         ]
 
-        prompt = "\n".join(lines)
+        prompt = "\n".join(prompt_lines)
+
+        completion = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You generate on-brand social captions."},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=300,
+        )
+        raw = completion.choices[0].message.content.strip()
 
         try:
-            completion = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "You create clear, practical brand personas for creators."},
-                    {"role": "user", "content": prompt},
-                ],
-                max_tokens=500,
-            )
-            raw = completion.choices[0].message.content.strip()
-            persona = json.loads(raw)
-        except Exception as e:
-            return Response(
-                {"detail": f"Could not generate brand persona: {e}"},
-                status=status.HTTP_502_BAD_GATEWAY,
-            )
+            data = json.loads(raw)
+        except Exception:
+            # fallback: simple splitting
+            data = {"captions": [raw]}
 
-        # Optional: store on profile
-        if profile:
-            profile.vibe = persona.get("recommended_vibe") or profile.vibe
-            profile.tone = persona.get("recommended_tone") or profile.tone
-            profile.niche = persona.get("niche") or profile.niche
-            profile.target_audience = persona.get("target_audience") or profile.target_audience
-            profile.brand_persona = json.dumps(persona)
-            profile.save()
+        if not isinstance(data, dict) or "captions" not in data:
+            data = {"captions": [raw]}
 
-        return Response(persona, status=status.HTTP_200_OK)
+        return Response(data, status=status.HTTP_200_OK)

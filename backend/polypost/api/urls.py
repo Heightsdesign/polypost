@@ -11,7 +11,9 @@ from .views import (
     SchedulerSuggestionsView, AnalyticsIngestView, StripeCheckoutSessionView,
     StripeWebhookView, MySubscriptionView, DraftListCreateView,
     DraftPinView, DraftArchiveView, UseCaseTemplateListView,
-    ApplyUseCaseTemplateView, MeProfileView, UsageSummaryView, PostingReminderListCreateView
+    ApplyUseCaseTemplateView, MeProfileView, UsageSummaryView, PostingReminderListCreateView,
+    AIPostingPlanView, PostingReminderDetailView, NotificationListView,
+    NotificationUnreadCountView, IdeaActionPlanView
     )
 from .views_auth import PasswordResetRequestView, PasswordResetConfirmView, LoginView, EmailConfirmView, ChangePasswordView, NewsletterSendView
 
@@ -21,7 +23,7 @@ from .views_feedback import (
     AppReviewFeaturedListView,
 )
 
-from .views_brand import BrandPersonaView
+from .views_brand import BrandPersonaView, BrandSampleCaptionsView
 
 router = DefaultRouter()
 router.register(r"uploads", MediaUploadViewSet, basename="uploads")
@@ -31,12 +33,30 @@ urlpatterns = [
     path("auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("captions/generate/", GenerateCaptionView.as_view(), name="caption-generate"),
     path("ideas/generate/", GenerateIdeasView.as_view(), name="ideas-generate"),
+    path("ideas/action-plan/", IdeaActionPlanView.as_view(), name="idea-action-plan"),
     path("scheduler/suggestions/", PostingSuggestionView.as_view(), name="posting-suggestions"),
     path("scheduler/plan/", PlanSlotView.as_view(), name="scheduler-plan"),
     path("scheduler/my/", MyPlannedSlotsView.as_view(), name="scheduler-my"),
 
     path("scheduler/suggestions/", SchedulerSuggestionsView.as_view(), name="scheduler-suggestions"),
     path("schedule/reminders/", PostingReminderListCreateView.as_view(), name="posting-reminders"),
+    path("scheduler/ai-plan/", AIPostingPlanView.as_view(), name="scheduler-ai-plan"),
+    path(
+        "schedule/reminders/<uuid:reminder_id>/",
+        PostingReminderDetailView.as_view(),
+        name="reminder-detail",
+    ),
+    path(
+        "notifications/unread-count/",
+        NotificationUnreadCountView.as_view(),
+        name="notifications-unread-count",
+    ),
+    path(
+        "notifications/",
+        NotificationListView.as_view(),
+        name="notifications-list",
+    ),
+
 
     path("analytics/ingest/", AnalyticsIngestView.as_view(), name="analytics-ingest"),
     path("billing/create-checkout-session/", StripeCheckoutSessionView.as_view(), name="stripe-checkout"),
@@ -46,6 +66,11 @@ urlpatterns = [
     path("drafts/<uuid:pk>/pin/", DraftPinView.as_view(), name="draft-pin"),
     path("drafts/<uuid:pk>/archive/", DraftArchiveView.as_view(), name="draft-archive"),
     path("brand/persona/", BrandPersonaView.as_view(), name="brand-persona"),
+    path(
+        "brand/persona/sample-captions/",
+        BrandSampleCaptionsView.as_view(),
+        name="brand-sample-captions",
+    ),
 
     path("auth/password-reset/", PasswordResetRequestView.as_view(), name="password-reset"),
     path("auth/password-reset/confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),

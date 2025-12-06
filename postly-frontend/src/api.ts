@@ -37,6 +37,7 @@ api.interceptors.request.use((config) => {
     "/auth/password-reset/",
     "/auth/password-reset/confirm/",
     "/brand/persona/",
+    "/brand/persona/sample-captions/",
   ];
 
   // If URL contains any public endpoint — skip auth header
