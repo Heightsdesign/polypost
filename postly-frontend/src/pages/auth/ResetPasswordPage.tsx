@@ -1,8 +1,11 @@
+// src/pages/auth/ResetPasswordPage.tsx
 import React, { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import api from "../../api";
+import { useLanguage } from "../../i18n/LanguageContext";
 
 const ResetPasswordPage: React.FC = () => {
+  const { t } = useLanguage();
   const [params] = useSearchParams();
   const navigate = useNavigate();
 
@@ -17,12 +20,12 @@ const ResetPasswordPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirm) {
-      setMessage("❌ Passwords do not match.");
+      setMessage(t("reset_error_mismatch"));
       return;
     }
 
     if (!uid || !token) {
-      setMessage("Invalid reset link.");
+      setMessage(t("reset_error_invalid_link"));
       return;
     }
 
@@ -35,11 +38,11 @@ const ResetPasswordPage: React.FC = () => {
         token,
         new_password: password,
       });
-      setMessage("✅ Password reset successful! Redirecting to login...");
+      setMessage(t("reset_success_message"));
       setTimeout(() => navigate("/login"), 2500);
     } catch (err: any) {
       console.error(err);
-      setMessage("⚠️ Reset failed. Link may be invalid or expired.");
+      setMessage(t("reset_error_failed"));
     } finally {
       setLoading(false);
     }
@@ -48,9 +51,11 @@ const ResetPasswordPage: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-md p-6 bg-white shadow-md rounded-2xl">
-        <h1 className="text-2xl font-semibold text-center mb-4">Reset Password</h1>
+        <h1 className="text-2xl font-semibold text-center mb-4">
+          {t("reset_title")}
+        </h1>
         <p className="text-sm text-gray-500 text-center mb-6">
-          Enter a new password for your account.
+          {t("reset_subtitle")}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -59,7 +64,7 @@ const ResetPasswordPage: React.FC = () => {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="New password"
+            placeholder={t("reset_password_placeholder")}
             className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
           />
 
@@ -68,7 +73,7 @@ const ResetPasswordPage: React.FC = () => {
             required
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
-            placeholder="Confirm password"
+            placeholder={t("reset_confirm_placeholder")}
             className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
           />
 
@@ -77,7 +82,7 @@ const ResetPasswordPage: React.FC = () => {
             disabled={loading}
             className="w-full bg-gradient-to-r from-purple to-pink text-white py-2 rounded-lg shadow-md shadow-purple/25 hover:shadow-purple/40 transition-all disabled:opacity-60"
           >
-            {loading ? "Resetting..." : "Set New Password"}
+            {loading ? t("reset_button_loading") : t("reset_button")}
           </button>
         </form>
 

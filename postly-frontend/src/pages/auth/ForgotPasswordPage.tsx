@@ -1,8 +1,11 @@
+// src/pages/auth/ForgotPasswordPage.tsx
 import React, { useState } from "react";
 import api from "../../api";
 import { useNavigate } from "react-router-dom";
+import { useLanguage } from "../../i18n/LanguageContext";
 
 const ForgotPasswordPage: React.FC = () => {
+  const { t } = useLanguage();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -15,10 +18,10 @@ const ForgotPasswordPage: React.FC = () => {
 
     try {
       await api.post("/auth/password-reset/", { email });
-      setMessage("✅ If that email exists, a reset link was sent!");
+      setMessage(t("forgot_success_message"));
     } catch (err: any) {
       console.error(err);
-      setMessage("⚠️ Something went wrong. Please try again.");
+      setMessage(t("forgot_error_message"));
     } finally {
       setLoading(false);
     }
@@ -27,9 +30,11 @@ const ForgotPasswordPage: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-md p-6 bg-white shadow-md rounded-2xl">
-        <h1 className="text-2xl font-semibold text-center mb-4">Forgot Password</h1>
+        <h1 className="text-2xl font-semibold text-center mb-4">
+          {t("forgot_title")}
+        </h1>
         <p className="text-sm text-gray-500 text-center mb-6">
-          Enter your email address, and we’ll send you a reset link.
+          {t("forgot_subtitle")}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -38,7 +43,7 @@ const ForgotPasswordPage: React.FC = () => {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
+            placeholder={t("forgot_email_placeholder")}
             className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
           />
 
@@ -47,7 +52,7 @@ const ForgotPasswordPage: React.FC = () => {
             disabled={loading}
             className="w-full bg-gradient-to-r from-purple to-pink text-white py-2 rounded-lg shadow-md shadow-purple/25 hover:shadow-purple/40 transition-all disabled:opacity-60"
           >
-            {loading ? "Sending..." : "Send Reset Link"}
+            {loading ? t("forgot_button_loading") : t("forgot_button")}
           </button>
         </form>
 
@@ -60,7 +65,7 @@ const ForgotPasswordPage: React.FC = () => {
             onClick={() => navigate("/login")}
             className="text-blue-600 hover:underline text-sm"
           >
-            Back to login
+            {t("forgot_back_to_login")}
           </button>
         </div>
       </div>

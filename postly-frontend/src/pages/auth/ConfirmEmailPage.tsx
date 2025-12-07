@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import api from "../../api";
+import { useLanguage } from "../../i18n/LanguageContext";
 
 const ConfirmEmailPage = () => {
+  const { t } = useLanguage();
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
-  const [message, setMessage] = useState("Confirming your email…");
+  const [message, setMessage] = useState(t("confirm_email_message_loading"));
 
   useEffect(() => {
     const uid = searchParams.get("uid");
@@ -13,7 +15,7 @@ const ConfirmEmailPage = () => {
 
     if (!uid || !token) {
       setStatus("error");
-      setMessage("Invalid confirmation link.");
+      setMessage(t("confirm_email_invalid_link"));
       return;
     }
 
@@ -21,14 +23,16 @@ const ConfirmEmailPage = () => {
       try {
         const res = await api.post("/auth/confirm-email/", { uid, token });
         setStatus("ok");
-        setMessage(res.data.detail || "Email confirmed! You can now log in.");
+        setMessage(
+          res.data.detail || t("confirm_email_success_message")
+        );
       } catch (err) {
         console.error(err);
         setStatus("error");
-        setMessage("This confirmation link is invalid or has expired.");
+        setMessage(t("confirm_email_expired_link"));
       }
     })();
-  }, [searchParams]);
+  }, [searchParams, t]);
 
   const colorClass =
     status === "ok"
@@ -41,9 +45,9 @@ const ConfirmEmailPage = () => {
     <div className="relative overflow-hidden min-h-screen flex items-center justify-center bg-offwhite px-4">
       <div className="max-w-md w-full bg-white/95 backdrop-blur rounded-3xl shadow-xl border border-purple/10 px-6 py-8">
         <h1 className="text-xl font-extrabold text-dark mb-3">
-          {status === "loading" && "Confirming…"}
-          {status === "ok" && "Email confirmed 🎉"}
-          {status === "error" && "Confirmation issue"}
+          {status === "loading" && t("confirm_email_title_loading")}
+          {status === "ok" && t("confirm_email_title_ok")}
+          {status === "error" && t("confirm_email_title_error")}
         </h1>
 
         <p className={`text-sm mb-5 ${colorClass}`}>{message}</p>
@@ -52,7 +56,7 @@ const ConfirmEmailPage = () => {
           to="/login"
           className="inline-flex items-center justify-center px-4 py-2 rounded-2xl text-sm font-semibold text-white bg-gradient-to-r from-purple to-pink shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
         >
-          Go to login
+          {t("confirm_email_go_to_login")}
         </Link>
       </div>
     </div>

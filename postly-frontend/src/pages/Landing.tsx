@@ -1,3 +1,4 @@
+// src/pages/Landing.tsx
 import { Link } from "react-router-dom";
 import Logo from "../assets/logo/logo-complete-color-wide.png";
 
@@ -7,29 +8,32 @@ import BlobYellow from "../assets/blobs/blob-3.png";
 import BlobRedSmall from "../assets/blobs/red-dot.png";
 import BlobYellowSmall from "../assets/blobs/yellow-dot.png";
 import BlobPurpleLarge from "../assets/blobs/blob-6.png";
-import BlobOrange from "../assets/blobs/blob-3.png";   
+import BlobOrange from "../assets/blobs/blob-3.png";
 import BlobGreen from "../assets/blobs/blob-4.png";
 import BlobPurpleDot from "../assets/blobs/blob-6.png";
 import BlobRedLarge from "../assets/blobs/blob-1.png";
 import BlobBlue from "../assets/blobs/blob-7.png";
 import BgBlur from "../assets/blobs/bg-blur.png";
 
+import { useLanguage } from "../i18n/LanguageContext";
 
 export default function Landing() {
+  const { t } = useLanguage();
+
   return (
-     <div className="relative overflow-hidden min-h-screen">
-       {/* Diagonal lens gradient overlay */}
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            zIndex: 0,
-            backgroundImage: `
+    <div className="relative overflow-hidden min-h-screen">
+      {/* Diagonal lens gradient overlay */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          zIndex: 0,
+          backgroundImage: `
               radial-gradient(120% 200% at 0% 0%, rgba(255, 111, 145, 0.16), transparent 60%),
               radial-gradient(120% 200% at 100% 100%, rgba(88, 80, 235, 0.18), transparent 60%)
             `,
-            opacity: 0.25,
-          }}
-        />
+          opacity: 0.25,
+        }}
+      />
 
       <img
         src={BgBlur}
@@ -39,21 +43,21 @@ export default function Landing() {
           top: "50%",
           left: "50%",
           transform: "translate(-50%, -50%)",
-          width: "2000px",   // adjust size here
+          width: "2000px",
           height: "auto",
           zIndex: 0,
-          opacity: 0.20,      // tweak to taste
+          opacity: 0.2,
         }}
-/>
-      
+      />
+
       {/* Playful background blobs as images */}
       <img
         src={BlobRed}
         alt=""
         className="pointer-events-none absolute"
         style={{
-          top: "140px",           // move up/down
-          left: "-160px",         // move left/right (negative = off-screen)
+          top: "140px",
+          left: "-160px",
           width: "380px",
           height: "auto",
           opacity: 0.75,
@@ -67,7 +71,7 @@ export default function Landing() {
         className="pointer-events-none absolute"
         style={{
           top: "260px",
-          right: "-260px",        // sticks out on the right
+          right: "-260px",
           width: "420px",
           height: "auto",
           opacity: 0.75,
@@ -80,7 +84,7 @@ export default function Landing() {
         alt=""
         className="pointer-events-none absolute"
         style={{
-          bottom: "-160px",       // mostly below the fold
+          bottom: "-160px",
           left: "50%",
           transform: "translateX(-50%)",
           width: "520px",
@@ -89,6 +93,7 @@ export default function Landing() {
           zIndex: 0,
         }}
       />
+
       <img
         src={BlobPurpleLarge}
         alt=""
@@ -104,7 +109,7 @@ export default function Landing() {
         }}
       />
 
-      {/* 2. Small yellow dot, top-left for balance */}
+      {/* Small yellow dot, top-left */}
       <img
         src={BlobYellowSmall}
         alt=""
@@ -119,7 +124,7 @@ export default function Landing() {
         }}
       />
 
-      {/* 3. Small red dot, bottom-left corner */}
+      {/* Small red dot, bottom-left */}
       <img
         src={BlobRedSmall}
         alt=""
@@ -149,7 +154,7 @@ export default function Landing() {
         }}
       />
 
-      {/* 2. Big green blob bleeding from bottom-right */}
+      {/* Big green blob bottom-right */}
       <img
         src={BlobGreen}
         alt=""
@@ -165,7 +170,7 @@ export default function Landing() {
         }}
       />
 
-      {/* 3. Medium purple square-ish blob behind mid-left */}
+      {/* Medium purple blob mid-left */}
       <img
         src={BlobPurpleDot}
         alt=""
@@ -181,7 +186,7 @@ export default function Landing() {
         }}
       />
 
-      {/* 4. Large red blob behind the bottom hero card */}
+      {/* Large red blob behind bottom hero card */}
       <img
         src={BlobRedLarge}
         alt=""
@@ -196,37 +201,35 @@ export default function Landing() {
           zIndex: 0,
         }}
       />
-      {/* Bottom-left blue blob (blob-7) */}
+
+      {/* Bottom-left blue blob */}
       <img
         src={BlobBlue}
         alt=""
         className="pointer-events-none absolute"
         style={{
-          bottom: "-150px",     // pushes it partially off-screen (bleed)
-          left: "120px",       // slightly off the left edge
-          width: "450px",       // quite large for a soft base
+          bottom: "-150px",
+          left: "120px",
+          width: "450px",
           height: "auto",
-          opacity: 0.8,        // not too strong
+          opacity: 0.8,
           transform: "rotate(4deg)",
           zIndex: 0,
         }}
       />
 
-
-  <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8">
-    {/* rest of your component unchanged */}
-
-          {/* LOGO – stays where it is */}
-          <div className="min-h-[80vh] flex flex-col justify-center items-center">
+      <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8">
+        {/* LOGO */}
+        <div className="min-h-[80vh] flex flex-col justify-center items-center">
           <div className="pt-16 flex justify-center">
             <img
               src={Logo}
-              alt="Polypost logo"
+              alt={t("landing_logo_alt")}
               className="block max-w-[140px] h-auto mb-6"
             />
           </div>
 
-          {/* HERO BLOCK – centered independently */}
+          {/* HERO BLOCK */}
           <div className="min-h-[60vh] flex items-center justify-center">
             <div className="mt-8 grid gap-12 md:grid-cols-[1.2fr,1fr] items-center">
               {/* LEFT COLUMN WITH BLOBS */}
@@ -241,7 +244,7 @@ export default function Landing() {
                     width: 220,
                     height: 220,
                     borderRadius: "999px",
-                    background: "rgba(212, 109, 238, 0.5)", 
+                    background: "rgba(212, 109, 238, 0.5)",
                     filter: "blur(40px)",
                   }}
                 />
@@ -256,23 +259,24 @@ export default function Landing() {
                     width: 240,
                     height: 240,
                     borderRadius: "999px",
-                    background: "rgba(69, 1, 255, 0.5)", // purple
+                    background: "rgba(69, 1, 255, 0.5)",
                     filter: "blur(40px)",
                   }}
                 />
+
                 <p className="text-xs font-semibold tracking-[0.2em] uppercase text-purple mb-3">
-                  Social media co-pilot
+                  {t("landing_tagline")}
                 </p>
 
                 <h1 className="hero-title mb-4">
-                  All-in-one content assistant{" "}
-                  <span className="text-purple">for creators</span>
+                  {t("landing_title_main")}{" "}
+                  <span className="text-purple">
+                    {t("landing_title_highlight")}
+                  </span>
                 </h1>
 
                 <p className="hero-text mt-2 text-left md:text-left">
-                  Generate smart ideas, write scroll-stopping captions, and plan
-                  your best posting times — without spending your whole day
-                  juggling platforms.
+                  {t("landing_subtitle")}
                 </p>
 
                 {/* Main actions */}
@@ -281,14 +285,14 @@ export default function Landing() {
                     to="/login"
                     className="inline-flex items-center justify-center px-6 py-3 rounded-2xl text-sm font-semibold text-white bg-gradient-to-r from-purple to-pink shadow-lg shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
                   >
-                    Log in
+                    {t("landing_login_cta")}
                   </Link>
 
                   <Link
                     to="/register"
                     className="inline-flex items-center justify-center px-6 py-3 rounded-2xl text-sm font-semibold border border-purple/30 text-purple bg-white/90 backdrop-blur hover:bg-white shadow-md hover:shadow-lg transition-all"
                   >
-                    Create an account
+                    {t("landing_register_cta")}
                   </Link>
                 </div>
               </div>
@@ -303,22 +307,34 @@ export default function Landing() {
                       </span>
                       <div>
                         <p className="text-xs text-dark/60 font-medium">
-                          Today&apos;s overview
+                          {t("landing_overview_label")}
                         </p>
                         <p className="text-sm font-semibold text-dark">
-                          Postly dashboard
+                          {t("landing_overview_title")}
                         </p>
                       </div>
                     </div>
                     <span className="text-[10px] px-2 py-1 rounded-full bg-teal/10 text-teal font-medium">
-                      Live preview
+                      {t("landing_overview_badge")}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-3 gap-3 mb-4">
-                    <StatPill label="Ideas" value="18" color="purple" />
-                    <StatPill label="Drafts" value="7" color="yellow" />
-                    <StatPill label="Scheduled" value="12" color="teal" />
+                    <StatPill
+                      label={t("landing_stats_ideas")}
+                      value="18"
+                      color="purple"
+                    />
+                    <StatPill
+                      label={t("landing_stats_drafts")}
+                      value="7"
+                      color="yellow"
+                    />
+                    <StatPill
+                      label={t("landing_stats_scheduled")}
+                      value="12"
+                      color="teal"
+                    />
                   </div>
 
                   <div className="mt-3 space-y-2">

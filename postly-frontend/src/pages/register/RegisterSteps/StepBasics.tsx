@@ -1,5 +1,6 @@
 // src/pages/register/RegisterSteps/StepBasics.tsx
 import React, { useState } from "react";
+import { useLanguage } from "../../../i18n/LanguageContext";
 
 type StepBasicsProps = {
   onNext: (data: {
@@ -11,14 +12,7 @@ type StepBasicsProps = {
   onBack: (data?: any) => void;
 };
 
-const LANGUAGES = [
-  { code: "en", label: "English" },
-  { code: "fr", label: "French" },
-  { code: "es", label: "Spanish" },
-  { code: "de", label: "German" },
-  { code: "pt", label: "Portuguese" },
-  { code: "it", label: "Italian" },
-];
+const LANG_CODES = ["en", "fr", "es", "pt"] as const;
 
 const PLATFORMS = [
   { value: "instagram", label: "Instagram" },
@@ -84,8 +78,10 @@ const COUNTRIES = [
 ];
 
 const StepBasics: React.FC<StepBasicsProps> = ({ onNext, onBack }) => {
+  const { lang, t } = useLanguage();
+
   const [data, setData] = useState({
-    preferred_language: "en",
+    preferred_language: lang, // default to detected / chosen language
     country: "France",
     city: "",
     default_platform: "instagram",
@@ -103,7 +99,7 @@ const StepBasics: React.FC<StepBasicsProps> = ({ onNext, onBack }) => {
 
   const handleNext = () => {
     if (!data.country || !data.city) {
-      alert("Please select a country and enter your city.");
+      alert(t("register_step_basics_country_city_required"));
       return;
     }
     onNext(data);
@@ -126,16 +122,16 @@ const StepBasics: React.FC<StepBasicsProps> = ({ onNext, onBack }) => {
           {/* Preferred language */}
           <div>
             <label className="block text-xs font-semibold text-dark/70 mb-1">
-              Preferred language
+              {t("register_step_basics_language_label")}
             </label>
             <select
               value={data.preferred_language}
               onChange={handleChange("preferred_language")}
               className="w-full rounded-2xl border border-purple/15 bg-white/90 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple focus:border-purple/40"
             >
-              {LANGUAGES.map((lang) => (
-                <option key={lang.code} value={lang.code}>
-                  {lang.label}
+              {LANG_CODES.map((code) => (
+                <option key={code} value={code}>
+                  {t(`register_language_${code}`)}
                 </option>
               ))}
             </select>
@@ -144,7 +140,7 @@ const StepBasics: React.FC<StepBasicsProps> = ({ onNext, onBack }) => {
           {/* Default platform */}
           <div>
             <label className="block text-xs font-semibold text-dark/70 mb-1">
-              Main platform
+              {t("register_step_basics_platform_label")}
             </label>
             <select
               value={data.default_platform}
@@ -152,7 +148,7 @@ const StepBasics: React.FC<StepBasicsProps> = ({ onNext, onBack }) => {
               className="w-full rounded-2xl border border-purple/15 bg-white/90 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple focus:border-purple/40"
             >
               {PLATFORMS.map((p) => (
-                <option key={p.value} value={p.value}>
+                <option key={`${p.value}-${p.label}`} value={p.value}>
                   {p.label}
                 </option>
               ))}
@@ -163,7 +159,7 @@ const StepBasics: React.FC<StepBasicsProps> = ({ onNext, onBack }) => {
         {/* Country */}
         <div>
           <label className="block text-xs font-semibold text-dark/70 mb-1">
-            Country
+            {t("register_step_basics_country_label")}
           </label>
           <select
             value={data.country}
@@ -181,17 +177,17 @@ const StepBasics: React.FC<StepBasicsProps> = ({ onNext, onBack }) => {
         {/* City */}
         <div>
           <label className="block text-xs font-semibold text-dark/70 mb-1">
-            City
+            {t("register_step_basics_city_label")}
           </label>
           <input
             type="text"
             value={data.city}
             onChange={handleChange("city")}
-            placeholder="Paris, New York, São Paulo…"
+            placeholder={t("register_step_basics_city_placeholder")}
             className="w-full rounded-2xl border border-purple/15 bg-white/90 px-3 py-2 text-sm text-dark placeholder:text-dark/40 focus:outline-none focus:ring-2 focus:ring-purple focus:border-purple/40"
           />
           <p className="mt-1 text-[11px] text-dark/55">
-            Later we can plug an autocomplete API here.
+            {t("register_step_basics_city_help")}
           </p>
         </div>
 
@@ -201,14 +197,14 @@ const StepBasics: React.FC<StepBasicsProps> = ({ onNext, onBack }) => {
             onClick={handleBackClick}
             className="flex-1 rounded-2xl border border-purple/20 bg-white/90 px-4 py-2.5 text-sm font-semibold text-purple hover:bg-white shadow-sm transition-all"
           >
-            ← Back
+            {t("register_step_basics_back")}
           </button>
           <button
             type="button"
             onClick={handleNext}
             className="flex-1 rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
           >
-            Next →
+            {t("register_step_basics_next")}
           </button>
         </div>
       </div>

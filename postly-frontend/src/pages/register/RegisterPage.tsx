@@ -5,8 +5,11 @@ import StepBasics from "./RegisterSteps/StepBasics";
 import StepTone from "./RegisterSteps/StepTone";
 import StepExtras from "./RegisterSteps/StepExtras";
 import api from "../../api";
+import { useLanguage } from "../../i18n/LanguageContext";
 
 const RegisterPage: React.FC = () => {
+  const { t } = useLanguage();
+
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<any>({});
   const [successMessage, setSuccessMessage] = useState("");
@@ -32,27 +35,25 @@ const RegisterPage: React.FC = () => {
     setSuccessMessage("");
     setErrorMessage("");
 
-    // merge step 4 data into the full payload
     const payload = extraData ? { ...formData, ...extraData } : formData;
 
     try {
       await api.post("/auth/register/", payload);
 
       setSuccessMessage(
-        "🎉 Your account has been created! Please check your inbox to confirm your email before logging in."
+        t("register_success_message")
       );
       setErrorMessage("");
     } catch (err: any) {
       console.error(err);
       setErrorMessage(
-        "Could not create your account. Please check your info or try again."
+        t("register_error_message")
       );
       setSuccessMessage("");
     } finally {
       setSubmitting(false);
     }
   };
-
 
   const steps = [
     <StepAccount key="step-1" onNext={handleNext} />,
@@ -62,11 +63,17 @@ const RegisterPage: React.FC = () => {
       key="step-4"
       onSubmit={handleSubmit}
       onBack={handleBack}
-      submitting={submitting} // ⬅ added
+      submitting={submitting}
     />,
   ];
 
-  const stepTitles = ["Account details", "Basics", "Style & audience", "Extras"];
+  const stepTitles = [
+    t("register_step_title_1"),
+    t("register_step_title_2"),
+    t("register_step_title_3"),
+    t("register_step_title_4"),
+  ];
+
   const progressPct = (step / totalSteps) * 100;
 
   return (
@@ -86,24 +93,24 @@ const RegisterPage: React.FC = () => {
 
       <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10 md:px-10">
         <div className="w-full max-w-5xl flex flex-col md:flex-row gap-10 items-start md:items-center">
-          
           {/* LEFT SIDE: Title + card */}
           <section className="w-full md:w-3/5">
             <div className="mb-6">
               <p className="text-xs font-semibold tracking-[0.2em] uppercase text-purple/80 mb-2">
-                Get started
+                {t("register_get_started")}
               </p>
               <h1 className="text-2xl md:text-3xl font-extrabold text-dark mb-2">
-                Create your <span className="text-purple">Postly account</span>
+                {t("register_title")}{" "}
+                <span className="text-purple">
+                  {t("register_title_highlight")}
+                </span>
               </h1>
               <p className="text-sm md:text-[0.95rem] text-dark/70 max-w-md">
-                We’ll use these details to personalise ideas, captions,
-                and posting times. It only takes a minute.
+                {t("register_subtitle")}
               </p>
             </div>
 
             <div className="bg-white/95 backdrop-blur rounded-3xl shadow-xl border border-purple/10 px-6 py-6 md:px-8 md:py-7">
-
               {/* Styled Success & Error Messages */}
               {successMessage && (
                 <div className="mb-4 flex items-start gap-2 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900 shadow-sm">
@@ -119,18 +126,18 @@ const RegisterPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Step header */}
               <div className="flex items-baseline justify-between gap-2 mb-4">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-purple/80 mb-1">
-                    Step {step} of {totalSteps}
+                    {t("register_step_prefix")} {step} {t("register_step_of")}{" "}
+                    {totalSteps}
                   </p>
                   <h2 className="text-base md:text-lg font-semibold text-dark">
                     {stepTitles[step - 1]}
                   </h2>
                 </div>
                 <span className="text-[11px] text-dark/55">
-                  {Math.round(progressPct)}% complete
+                  {Math.round(progressPct)}% {t("register_progress_suffix")}
                 </span>
               </div>
 
@@ -151,17 +158,16 @@ const RegisterPage: React.FC = () => {
           <aside className="hidden md:block w-full md:w-2/5">
             <div className="bg-white/80 backdrop-blur-md rounded-3xl shadow-lg border border-purple/10 px-6 py-6 text-sm text-dark/75">
               <p className="text-xs font-semibold tracking-[0.18em] uppercase text-purple mb-2">
-                Why all these questions?
+                {t("register_sidebar_title")}
               </p>
               <ul className="space-y-2 text-xs md:text-[0.86rem]">
-                <li>• We match ideas to your niche and audience.</li>
-                <li>• We tune captions to your preferred tone of voice.</li>
-                <li>• We suggest posting times based on your platforms.</li>
-                <li>• You can edit everything later anytime.</li>
+                <li>• {t("register_sidebar_item_1")}</li>
+                <li>• {t("register_sidebar_item_2")}</li>
+                <li>• {t("register_sidebar_item_3")}</li>
+                <li>• {t("register_sidebar_item_4")}</li>
               </ul>
             </div>
           </aside>
-
         </div>
       </div>
     </div>

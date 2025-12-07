@@ -125,6 +125,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "api.tasks.send_weekly_summary_email",
         "schedule": crontab(hour=9, minute=0, day_of_week="1"),  # Monday 09:00
     },
+    "check-upcoming-posts-every-15-min": {
+        "task": "api.tasks.check_upcoming_posts",
+        "schedule": 60 * 15,  # every 15 minutes
+    },
 }
 
 # -----------------------------------------------------------------------------
@@ -205,3 +209,7 @@ AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Polypost <polypost-management@polypost-platform.com>")
+
+
+MAXMIND_ACCOUNT_ID = os.environ.get("MAXMIND_ACCOUNT_ID", "")
+MAXMIND_LICENSE_KEY = os.environ.get("MAXMIND_LICENSE_KEY", "")

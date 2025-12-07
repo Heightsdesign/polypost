@@ -36,6 +36,8 @@ from .utils import (
 
 from .utils import check_usage_allowed, increment_usage, send_postly_email
 
+from .geo_utils import get_country_code_from_ip, language_from_country_code
+
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -1177,3 +1179,26 @@ class BioVariantsView(views.APIView):
                 {"detail": f"OpenAI error: {str(e)}"},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
+        
+class DetectLanguageView(views.APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get_client_ip(self, request):
+        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(",")[0].strip()
+        else:
+            ip = request.META.get("REMOTE_ADDR")
+        return ip
+
+    def get(self, request, *args, **kwargs):
+        if settings.DEBUG:
+            # Dev-only: force a test IP so you can see language switching locally
+            ip = "81.185.76.55"  # French IP for testing
+        else:
+            ip = self.get_client_ip(request)
+
+        country_code = get_country_code_from_ip(ip)
+        lang = language_from_country_code(country_code)
+
+        return Response({"language": lang}, status=status.HTTP_200_OK)

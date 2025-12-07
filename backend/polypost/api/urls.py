@@ -13,7 +13,8 @@ from .views import (
     DraftPinView, DraftArchiveView, UseCaseTemplateListView,
     ApplyUseCaseTemplateView, MeProfileView, UsageSummaryView, PostingReminderListCreateView,
     AIPostingPlanView, PostingReminderDetailView, NotificationListView,
-    NotificationUnreadCountView, IdeaActionPlanView, BioVariantsView
+    NotificationUnreadCountView, IdeaActionPlanView, BioVariantsView,
+    DetectLanguageView
     )
 from .views_auth import PasswordResetRequestView, PasswordResetConfirmView, LoginView, EmailConfirmView, ChangePasswordView, NewsletterSendView
 
@@ -65,7 +66,7 @@ urlpatterns = [
     path("drafts/", DraftListCreateView.as_view(), name="draft-list-create"),
     path("drafts/<uuid:pk>/pin/", DraftPinView.as_view(), name="draft-pin"),
     path("drafts/<uuid:pk>/archive/", DraftArchiveView.as_view(), name="draft-archive"),
-    
+
     path("brand/persona/", BrandPersonaView.as_view(), name="brand-persona"),
     path(
         "brand/persona/sample-captions/",
@@ -94,5 +95,7 @@ urlpatterns = [
     path("usage/summary/", UsageSummaryView.as_view(), name="usage-summary"),
 
     path("newsletter/send/", NewsletterSendView.as_view(), name="newsletter-send"),
+
+    path("detect-language/", DetectLanguageView.as_view(), name="detect-language"),
 
 ] + router.urls

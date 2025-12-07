@@ -1,5 +1,5 @@
-// src/pages/register/RegisterSteps/StepExtras.tsx
 import React, { useState } from "react";
+import { useLanguage } from "../../../i18n/LanguageContext";
 
 type StepExtrasProps = {
   onSubmit: (data: {
@@ -12,12 +12,18 @@ type StepExtrasProps = {
 };
 
 const STAGES = [
-  { value: "starter", label: "Just starting out" },
-  { value: "growing", label: "Growing audience" },
-  { value: "pro", label: "Full-time creator" },
+  { value: "starter", key: "starter" },
+  { value: "growing", key: "growing" },
+  { value: "pro", key: "pro" },
 ];
 
-const StepExtras: React.FC<StepExtrasProps> = ({ onSubmit, onBack, submitting }) => {
+const StepExtras: React.FC<StepExtrasProps> = ({
+  onSubmit,
+  onBack,
+  submitting,
+}) => {
+  const { t } = useLanguage();
+
   const [data, setData] = useState({
     marketing_opt_in: true,
     notifications_enabled: true,
@@ -44,7 +50,7 @@ const StepExtras: React.FC<StepExtrasProps> = ({ onSubmit, onBack, submitting })
         {/* stage radios */}
         <div>
           <label className="block text-xs font-semibold text-dark/70 mb-2">
-            Where are you in your creator journey?
+            {t("register_step_extras_stage_question")}
           </label>
           <div className="space-y-2">
             {STAGES.map((s) => (
@@ -62,7 +68,9 @@ const StepExtras: React.FC<StepExtrasProps> = ({ onSubmit, onBack, submitting })
                   }
                   className="mt-[2px]"
                 />
-                <span className="font-medium text-dark/85">{s.label}</span>
+                <span className="font-medium text-dark/85">
+                  {t(`register_step_extras_stage_${s.key}`)}
+                </span>
               </label>
             ))}
           </div>
@@ -71,7 +79,7 @@ const StepExtras: React.FC<StepExtrasProps> = ({ onSubmit, onBack, submitting })
         {/* marketing opt in */}
         <div>
           <label className="block text-xs font-semibold text-dark/70 mb-2">
-            Stay in the loop?
+            {t("register_step_extras_marketing_label")}
           </label>
           <label className="flex items-center gap-2 text-xs md:text-sm text-dark/75">
             <input
@@ -85,19 +93,17 @@ const StepExtras: React.FC<StepExtrasProps> = ({ onSubmit, onBack, submitting })
               }
               className="h-4 w-4 rounded border-purple/40 text-purple focus:ring-purple"
             />
-            <span>
-              Yes, I&apos;d like occasional tips, feature updates and content
-              ideas by email.
-            </span>
+            <span>{t("register_step_extras_marketing_text")}</span>
           </label>
           <p className="mt-1 text-[11px] text-dark/55">
-            No spam. You can opt out anytime with one click.
+            {t("register_step_extras_marketing_helper")}
           </p>
         </div>
+
         {/* notifications opt in */}
         <div>
           <label className="block text-xs font-semibold text-dark/70 mb-2">
-            Enable notifications?
+            {t("register_step_extras_notifications_label")}
           </label>
           <label className="flex items-center gap-2 text-xs md:text-sm text-dark/75">
             <input
@@ -111,15 +117,12 @@ const StepExtras: React.FC<StepExtrasProps> = ({ onSubmit, onBack, submitting })
               }
               className="h-4 w-4 rounded border-purple/40 text-purple focus:ring-purple"
             />
-            <span>
-              Yes, send me reminders for my scheduled posts & content ideas.
-            </span>
+            <span>{t("register_step_extras_notifications_text")}</span>
           </label>
           <p className="mt-1 text-[11px] text-dark/55">
-            You can turn this off anytime in account settings.
+            {t("register_step_extras_notifications_helper")}
           </p>
         </div>
-
 
         <div className="mt-6 flex gap-3">
           <button
@@ -127,7 +130,7 @@ const StepExtras: React.FC<StepExtrasProps> = ({ onSubmit, onBack, submitting })
             onClick={handleBackClick}
             className="flex-1 rounded-2xl border border-purple/20 bg-white/90 px-4 py-2.5 text-sm font-semibold text-purple hover:bg-white shadow-sm transition-all"
           >
-            ← Back
+            {t("register_step_extras_back")}
           </button>
           <button
             type="button"
@@ -139,7 +142,9 @@ const StepExtras: React.FC<StepExtrasProps> = ({ onSubmit, onBack, submitting })
                 : "hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0"
             }`}
           >
-            {submitting ? "Creating account…" : "Create account 🎉"}
+            {submitting
+              ? t("register_step_extras_submit_creating")
+              : t("register_step_extras_submit")}
           </button>
         </div>
       </div>

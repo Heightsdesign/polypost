@@ -1,6 +1,7 @@
 // src/pages/register/RegisterSteps/StepTone.tsx
 import React, { useState } from "react";
 import api from "../../../api";
+import { useLanguage } from "../../../i18n/LanguageContext";
 
 const ALL_PLATFORMS = [
   { value: "instagram", label: "Instagram" },
@@ -26,36 +27,30 @@ type StepToneProps = {
 };
 
 const VIBES = [
-  "Fun",
-  "Chill",
-  "Bold",
-  "Educational",
-  "Luxury",
-  "Cozy",
-  "High-energy",
-  "Mysterious",
-  "Wholesome",
+  { value: "Fun", key: "fun" },
+  { value: "Chill", key: "chill" },
+  { value: "Bold", key: "bold" },
+  { value: "Educational", key: "educational" },
+  { value: "Luxury", key: "luxury" },
+  { value: "Cozy", key: "cozy" },
+  { value: "High-energy", key: "high_energy" },
+  { value: "Mysterious", key: "mysterious" },
+  { value: "Wholesome", key: "wholesome" },
 ];
 
 const TONES = [
-  "Casual",
-  "Professional",
-  "Playful",
-  "Flirty",
-  "Inspirational",
-  "Sarcastic",
-  "Empathetic",
-  "Confident",
+  { value: "Casual", key: "casual" },
+  { value: "Professional", key: "professional" },
+  { value: "Playful", key: "playful" },
+  { value: "Flirty", key: "flirty" },
+  { value: "Inspirational", key: "inspirational" },
+  { value: "Sarcastic", key: "sarcastic" },
+  { value: "Empathetic", key: "empathetic" },
+  { value: "Confident", key: "confident" },
 ];
 
-const LANGUAGES = [
-  { code: "en", label: "English" },
-  { code: "fr", label: "French" },
-  { code: "es", label: "Spanish" },
-  { code: "de", label: "German" },
-  { code: "pt", label: "Portuguese" },
-  { code: "it", label: "Italian" },
-];
+// languages for the *content* (GPT), not UI
+const CONTENT_LANG_CODES = ["en", "fr", "es", "de", "pt", "it"] as const;
 
 type BrandPersona = {
   persona_name?: string;
@@ -69,16 +64,19 @@ type BrandPersona = {
 };
 
 const StepTone: React.FC<StepToneProps> = ({ onNext, onBack }) => {
+  const { lang, t } = useLanguage();
+
   const [data, setData] = useState({
+    // keep DB values in English; these are what you already use
     vibe: "Fun",
     tone: "Casual",
     niche: "",
     target_audience: "",
-    content_languages: "en",
+    content_languages: CONTENT_LANG_CODES.includes(lang as any) ? lang : "en",
     preferred_platforms: ["instagram"],
   });
 
-const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
     "instagram",
   ]);
 
@@ -151,7 +149,7 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
       }
     } catch (err) {
       console.error(err);
-      setBrandError("Could not generate brand personas. Try again.");
+      setBrandError(t("register_step_tone_brand_error"));
     } finally {
       setBrandLoading(false);
     }
@@ -205,8 +203,6 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
     }
   }
 
-  // ----------------------------------
-
   const updateField =
     (field: keyof typeof data) =>
     (
@@ -220,13 +216,13 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
 
   const handleNext = () => {
     if (!data.niche) {
-      alert("Tell us your niche so we can tailor ideas.");
+      alert(t("register_step_tone_niche_required"));
       return;
     }
     onNext({
-    ...data,
-    preferred_platforms: selectedPlatforms,   // 👈 important
-  });
+      ...data,
+      preferred_platforms: selectedPlatforms,
+    });
   };
 
   const handleBackClick = () => {
@@ -248,16 +244,16 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
         {/* Vibe chips */}
         <div>
           <label className="block text-xs font-semibold text-dark/70 mb-2">
-            Overall vibe
+            {t("register_step_tone_vibe_label")}
           </label>
           <div className="flex flex-wrap gap-2">
             {VIBES.map((v) => {
-              const active = data.vibe === v;
+              const active = data.vibe === v.value;
               return (
                 <button
-                  key={v}
+                  key={v.key}
                   type="button"
-                  onClick={() => setData({ ...data, vibe: v })}
+                  onClick={() => setData({ ...data, vibe: v.value })}
                   className={[
                     "px-3 py-1.5 rounded-2xl text-xs font-semibold border transition-all",
                     active
@@ -265,7 +261,7 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
                       : "bg-white/90 text-dark/80 border-purple/15 hover:border-purple/40",
                   ].join(" ")}
                 >
-                  {v}
+                  {t(`register_step_tone_vibe_${v.key}`)}
                 </button>
               );
             })}
@@ -275,16 +271,16 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
         {/* Tone chips */}
         <div>
           <label className="block text-xs font-semibold text-dark/70 mb-2">
-            Tone of voice
+            {t("register_step_tone_tone_label")}
           </label>
           <div className="flex flex-wrap gap-2">
-            {TONES.map((t) => {
-              const active = data.tone === t;
+            {TONES.map((tone) => {
+              const active = data.tone === tone.value;
               return (
                 <button
-                  key={t}
+                  key={tone.key}
                   type="button"
-                  onClick={() => setData({ ...data, tone: t })}
+                  onClick={() => setData({ ...data, tone: tone.value })}
                   className={[
                     "px-3 py-1.5 rounded-2xl text-xs font-semibold border transition-all",
                     active
@@ -292,44 +288,47 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
                       : "bg-white/90 text-dark/80 border-purple/15 hover:border-purple/40",
                   ].join(" ")}
                 >
-                  {t}
+                  {t(`register_step_tone_tone_${tone.key}`)}
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Niche + audience */}
+        {/* Niche + audience + platforms */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold text-dark/70 mb-1">
-              Niche
+              {t("register_step_tone_niche_label")}
             </label>
             <input
               type="text"
               value={data.niche}
               onChange={updateField("niche")}
-              placeholder="Fitness, comedy, beauty, finance…"
+              placeholder={t("register_step_tone_niche_placeholder")}
               className="w-full rounded-2xl border border-purple/15 bg-white/90 px-3 py-2 text-sm placeholder:text-dark/40 focus:outline-none focus:ring-2 focus:ring-purple focus:border-purple/40"
             />
           </div>
           <div>
             <label className="block text-xs font-semibold text-dark/70 mb-1">
-              Target audience
+              {t("register_step_tone_target_label")}
             </label>
             <input
               type="text"
               value={data.target_audience}
               onChange={updateField("target_audience")}
-              placeholder="e.g. Gen Z women, busy parents…"
+              placeholder={t("register_step_tone_target_placeholder")}
               className="w-full rounded-2xl border border-purple/15 bg-white/90 px-3 py-2 text-sm placeholder:text-dark/40 focus:outline-none focus:ring-2 focus:ring-purple focus:border-purple/40"
             />
           </div>
+
           {/* Platforms (optional multi-select) */}
-          <div>
+          <div className="md:col-span-2">
             <label className="block text-xs font-semibold text-dark/70 mb-2">
-              Main platforms you post on
-              <span className="ml-1 text-[10px] text-dark/50">(you can pick several)</span>
+              {t("register_step_tone_platforms_label")}
+              <span className="ml-1 text-[10px] text-dark/50">
+                {t("register_step_tone_platforms_hint")}
+              </span>
             </label>
             <div className="flex flex-wrap gap-2">
               {ALL_PLATFORMS.map((p) => {
@@ -354,33 +353,35 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
           </div>
         </div>
 
-        {/* Language */}
+        {/* Content language */}
         <div>
           <label className="block text-xs font-semibold text-dark/70 mb-1">
-            Main content language
+            {t("register_step_tone_content_lang_label")}
           </label>
           <select
             value={data.content_languages}
             onChange={updateField("content_languages")}
             className="w-full rounded-2xl border border-purple/15 bg-white/90 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple focus:border-purple/40"
           >
-            {LANGUAGES.map((lang) => (
-              <option key={lang.code} value={lang.code}>
-                {lang.label}
+            {CONTENT_LANG_CODES.map((code) => (
+              <option key={code} value={code}>
+                {t(`register_language_${code}`)}
               </option>
             ))}
           </select>
           <p className="mt-1 text-[11px] text-dark/55">
-            We&apos;ll prioritise this language when generating your captions.
+            {t("register_step_tone_content_lang_help")}
           </p>
         </div>
 
-        {/* BRAND ASSISTANT BUTTON */}
+        {/* BRAND ASSISTANT BOX */}
         <div className="mt-4 rounded-2xl bg-white/70 border border-purple/10 px-3 py-3">
           <p className="text-[0.75rem] text-dark/70 mb-2">
-            Not sure how to fill this section?{" "}
-            <span className="font-semibold text-purple">Optional</span>: let AI
-            suggest a vibe, tone & niche based on your goals.
+            {t("register_step_tone_brand_intro")}{" "}
+            <span className="font-semibold text-purple">
+              {t("register_step_tone_brand_optional")}
+            </span>
+            : {t("register_step_tone_brand_description")}
           </p>
 
           <button
@@ -388,7 +389,7 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
             onClick={() => setOpenBrandModal(true)}
             className="inline-flex items-center justify-center rounded-2xl bg-purple/10 px-3 py-1.5 text-[0.75rem] font-semibold text-purple hover:bg-purple/15 transition-all"
           >
-            🎭 Open brand assistant
+            🎭 {t("register_step_tone_brand_button")}
           </button>
         </div>
 
@@ -399,14 +400,14 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
             onClick={handleBackClick}
             className="flex-1 rounded-2xl border border-purple/20 bg-white/90 px-4 py-2.5 text-sm font-semibold text-purple hover:bg-white shadow-sm transition-all"
           >
-            ← Back
+            {t("register_step_tone_back")}
           </button>
           <button
             type="button"
             onClick={handleNext}
             className="flex-1 rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
           >
-            Next →
+            {t("register_step_tone_next")}
           </button>
         </div>
       </div>
@@ -424,14 +425,14 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
             </button>
 
             <h2 className="text-lg font-semibold text-dark mb-3">
-              Brand assistant (optional)
+              {t("register_step_tone_brand_title")}
             </h2>
 
             {/* Form inputs */}
             <div className="space-y-3 text-xs md:text-sm">
               <input
                 className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2"
-                placeholder="Your niche (e.g. fitness, OF, comedy…) "
+                placeholder={t("register_step_tone_brand_niche_placeholder")}
                 value={brandForm.niche}
                 onChange={(e) =>
                   setBrandForm({ ...brandForm, niche: e.target.value })
@@ -439,7 +440,9 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
               />
               <input
                 className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2"
-                placeholder="Target audience (e.g. Gen Z men, OF subs…)"
+                placeholder={t(
+                  "register_step_tone_brand_target_placeholder"
+                )}
                 value={brandForm.target_audience}
                 onChange={(e) =>
                   setBrandForm({
@@ -450,7 +453,7 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
               />
               <textarea
                 className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2"
-                placeholder="Your goals (grow subs, sell content, build long-term brand…)"
+                placeholder={t("register_step_tone_brand_goals_placeholder")}
                 rows={3}
                 value={brandForm.goals}
                 onChange={(e) =>
@@ -459,7 +462,9 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
               />
               <input
                 className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2"
-                placeholder="Comfort level (e.g. shy, flirty, bold, anonymous…)"
+                placeholder={t(
+                  "register_step_tone_brand_comfort_placeholder"
+                )}
                 value={brandForm.comfort_level}
                 onChange={(e) =>
                   setBrandForm({
@@ -479,7 +484,9 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
                 disabled={brandLoading}
                 className="w-full inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 font-semibold text-white shadow-md shadow-purple/30 disabled:opacity-60"
               >
-                {brandLoading ? "Thinking…" : "Generate brand personas"}
+                {brandLoading
+                  ? t("register_step_tone_brand_thinking")
+                  : t("register_step_tone_brand_generate")}
               </button>
             </div>
 
@@ -487,8 +494,7 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
             {brandPersonas.length > 0 && (
               <div className="mt-5 space-y-3 text-xs md:text-sm">
                 <p className="text-[0.8rem] text-dark/65">
-                  Pick the persona that feels most like you. You can still edit
-                  everything later.
+                  {t("register_step_tone_brand_pick_persona")}
                 </p>
 
                 {brandPersonas.map((p, idx) => {
@@ -505,14 +511,19 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
                     >
                       <div className="flex items-start justify-between gap-2 mb-1">
                         <h3 className="font-semibold text-dark">
-                          {p.persona_name || `Persona ${idx + 1}`}
+                          {p.persona_name ||
+                            `${t(
+                              "register_step_tone_brand_persona_prefix"
+                            )} ${idx + 1}`}
                         </h3>
                         <button
                           type="button"
                           onClick={() => handleUsePersona(idx)}
                           className="rounded-2xl bg-purple/10 px-2.5 py-1 text-[0.7rem] font-semibold text-purple hover:bg-purple/20"
                         >
-                          {active ? "Selected ✓" : "Use this persona"}
+                          {active
+                            ? t("register_step_tone_brand_selected")
+                            : t("register_step_tone_brand_use_persona")}
                         </button>
                       </div>
                       {p.brand_summary && (
@@ -521,19 +532,26 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
                         </p>
                       )}
                       <p className="text-[0.75rem] text-dark/70">
-                        <strong>Vibe:</strong> {p.recommended_vibe || "—"} ·{" "}
-                        <strong>Tone:</strong> {p.recommended_tone || "—"}
+                        <strong>{t("register_step_tone_brand_vibe_label")}</strong>{" "}
+                        {p.recommended_vibe || "—"} ·{" "}
+                        <strong>{t("register_step_tone_brand_tone_label")}</strong>{" "}
+                        {p.recommended_tone || "—"}
                       </p>
                       {Array.isArray(p.content_pillars) &&
                         p.content_pillars.length > 0 && (
                           <p className="mt-1 text-[0.75rem] text-dark/70">
-                            <strong>Content pillars:</strong>{" "}
+                            <strong>
+                              {t("register_step_tone_brand_pillars_label")}
+                            </strong>{" "}
                             {p.content_pillars.join(" · ")}
                           </p>
                         )}
                       {p.brand_bio && (
                         <p className="mt-2 rounded-2xl bg-purple/5 border border-purple/10 px-3 py-2 text-[0.75rem]">
-                          <strong>Bio idea:</strong> {p.brand_bio}
+                          <strong>
+                            {t("register_step_tone_brand_bio_label")}
+                          </strong>{" "}
+                          {p.brand_bio}
                         </p>
                       )}
                     </div>
@@ -547,7 +565,7 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
               <div className="mt-4 border-t border-purple/10 pt-3">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-xs md:text-sm font-semibold text-dark">
-                    Sample posts in this style
+                    {t("register_step_tone_samples_title")}
                   </h3>
                   <button
                     type="button"
@@ -555,14 +573,15 @@ const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([
                     disabled={captionsLoading}
                     className="rounded-2xl bg-purple/10 px-2.5 py-1 text-[0.7rem] font-semibold text-purple hover:bg-purple/20 disabled:opacity-60"
                   >
-                    {captionsLoading ? "Generating…" : "Generate sample posts"}
+                    {captionsLoading
+                      ? t("register_step_tone_samples_generating")
+                      : t("register_step_tone_samples_generate_button")}
                   </button>
                 </div>
 
                 {sampleCaptions.length === 0 && !captionsLoading && (
                   <p className="text-[0.75rem] text-dark/65">
-                    Click “Generate sample posts” to preview how your content
-                    might sound.
+                    {t("register_step_tone_samples_hint")}
                   </p>
                 )}
 

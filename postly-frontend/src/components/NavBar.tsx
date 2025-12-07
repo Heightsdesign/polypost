@@ -1,8 +1,11 @@
 // src/components/Navbar.tsx
 import { useEffect, useState } from "react";
+import type { ReactNode, ChangeEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Logo from "../assets/logo/logo-font-black-wide.png";
 import api, { setAuthToken } from "../api";
+import { useLanguage } from "../i18n/LanguageContext";
+import type { SupportedLang } from "../i18n/translations";
 
 type UserInfo = {
   username: string | null;
@@ -52,6 +55,8 @@ export default function Navbar() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notifLoading, setNotifLoading] = useState(false);
+
+  const { lang, t, setLang } = useLanguage();
 
   // Re-check token + profile on route changes
   useEffect(() => {
@@ -111,7 +116,7 @@ export default function Navbar() {
   }, [loc.pathname]);
 
   const isLoggedIn = hasToken;
-  const displayName = user?.username || "Account";
+  const displayName = user?.username || t("navbar_account_fallback");
 
   const handleLogout = () => {
     setAuthToken(null);
@@ -120,6 +125,11 @@ export default function Navbar() {
     setAvatarUrl(null);
     setNotifications([]);
     navigate("/login");
+  };
+
+  const handleLanguageChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    const newLang = e.target.value as SupportedLang;
+    setLang(newLang, { persist: true, syncProfile: isLoggedIn });
   };
 
   const isUseCases = loc.pathname.startsWith("/use-cases");
@@ -155,7 +165,7 @@ export default function Navbar() {
           <Link to="/" className="flex items-center gap-2">
             <img
               src={Logo}
-              alt="Polypost logo"
+              alt={t("navbar_logo_alt")}
               className="h-7 w-auto md:h-8"
             />
           </Link>
@@ -172,7 +182,7 @@ export default function Navbar() {
                   : "text-dark/70 hover:text-purple transition-colors"
               }
             >
-              Use cases
+              {t("navbar_use_cases")}
             </Link>
             <Link
               to="/pricing"
@@ -182,13 +192,31 @@ export default function Navbar() {
                   : "text-dark/70 hover:text-purple transition-colors"
               }
             >
-              Pricing
+              {t("navbar_pricing")}
             </Link>
           </div>
         </div>
 
-        {/* RIGHT: notifications + auth / account dropdown */}
+        {/* RIGHT: language + notifications + auth / account dropdown */}
         <div className="flex-1 flex items-center justify-end gap-3">
+          {/* Language selector */}
+          <div className="hidden sm:inline-flex items-center">
+            <label className="sr-only" htmlFor="navbar-language">
+              {t("navbar_language")}
+            </label>
+            <select
+              id="navbar-language"
+              value={lang}
+              onChange={handleLanguageChange}
+              className="rounded-2xl border border-purple/20 bg-white/80 px-2 py-1 text-[0.7rem] md:text-xs text-dark/80 hover:border-purple/40 focus:outline-none focus:ring-1 focus:ring-purple/40"
+            >
+              <option value="en">EN</option>
+              <option value="fr">FR</option>
+              <option value="es">ES</option>
+              <option value="pt">PT</option>
+            </select>
+          </div>
+
           {isLoggedIn && (
             <div className="relative">
               <button
@@ -208,19 +236,18 @@ export default function Navbar() {
                 <div className="absolute right-0 mt-2 w-72 rounded-2xl border border-purple/15 bg-white/95 shadow-lg text-xs md:text-sm py-2 max-h-80 overflow-y-auto">
                   <div className="px-3 pb-2 flex items-center justify-between">
                     <span className="font-semibold text-dark">
-                      Notifications
+                      {t("navbar_notifications_title")}
                     </span>
                     {notifLoading && (
                       <span className="text-[10px] text-dark/50">
-                        Loading…
+                        {t("navbar_notifications_loading")}
                       </span>
                     )}
                   </div>
 
                   {notifications.length === 0 && !notifLoading && (
                     <div className="px-3 py-2 text-[0.8rem] text-dark/70">
-                      No notifications yet. We’ll remind you before scheduled
-                      posts and important updates.
+                      {t("navbar_notifications_empty")}
                     </div>
                   )}
 
@@ -254,13 +281,13 @@ export default function Navbar() {
                 to="/login"
                 className="text-xs md:text-sm font-semibold text-dark/80 hover:text-purple transition-colors"
               >
-                Log in
+                {t("navbar_login")}
               </Link>
               <Link
                 to="/register"
                 className="hidden sm:inline-flex items-center justify-center px-4 py-2 rounded-2xl text-xs md:text-sm font-semibold text-white bg-gradient-to-r from-purple to-pink shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
               >
-                Get started
+                {t("navbar_get_started")}
               </Link>
             </>
           ) : (
@@ -287,9 +314,7 @@ export default function Navbar() {
                 </div>
 
                 <div className="flex flex-col items-start leading-tight">
-                  <span className="text-xs md:text-sm">
-                    {displayName}
-                  </span>
+                  <span className="text-xs md:text-sm">{displayName}</span>
                   {user?.email && (
                     <span className="hidden md:block text-[0.7rem] text-dark/55 max-w-[180px] truncate">
                       {user.email}
@@ -305,26 +330,26 @@ export default function Navbar() {
                     to="/dashboard"
                     onClick={() => setMenuOpen(false)}
                   >
-                    Dashboard
+                    {t("navbar_dashboard")}
                   </DropdownItem>
                   <DropdownItem
                     to="/account"
                     onClick={() => setMenuOpen(false)}
                   >
-                    Account
+                    {t("navbar_account")}
                   </DropdownItem>
                   <DropdownItem
                     to="/gallery"
                     onClick={() => setMenuOpen(false)}
                   >
-                    Gallery
+                    {t("navbar_gallery")}
                   </DropdownItem>
 
                   <DropdownItem
                     to="/support"
                     onClick={() => setMenuOpen(false)}
                   >
-                    Support
+                    {t("navbar_support")}
                   </DropdownItem>
 
                   <div className="my-1 border-t border-purple/10" />
@@ -334,7 +359,7 @@ export default function Navbar() {
                     onClick={handleLogout}
                     className="w-full text-left px-3 py-2 text-[0.78rem] md:text-xs text-dark/80 hover:bg-purple/5"
                   >
-                    Log out
+                    {t("navbar_logout")}
                   </button>
                 </div>
               )}
@@ -349,7 +374,7 @@ export default function Navbar() {
 type DropdownItemProps = {
   to: string;
   onClick?: () => void;
-  children: React.ReactNode;
+  children: ReactNode;
 };
 
 function DropdownItem({ to, onClick, children }: DropdownItemProps) {
