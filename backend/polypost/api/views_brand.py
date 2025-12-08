@@ -9,11 +9,14 @@ from .utils import build_brand_personas
 
 from rest_framework import serializers
 from .utils import client
-
+from .email_templates import normalize_lang_code
+from .views import get_request_lang
+from .models import CreatorProfile
 
 class BrandPersonaView(APIView):
     """
     Public endpoint: returns 3 persona options.
+    Used both during registration (anonymous) and for logged-in users.
     """
     permission_classes = [permissions.AllowAny]
 
@@ -22,12 +25,21 @@ class BrandPersonaView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        # 🔥 Resolve language:
+        # 1) if payload provides preferred_language, use it
+        # 2) otherwise let get_request_lang fall back to profile/IP/default
+        raw_lang = data.get("preferred_language") or request.data.get("preferred_language")
+        lang = get_request_lang(request, raw_lang)
+
+        print(f"[BRAND_PERSONA_VIEW] raw_lang={raw_lang!r} -> resolved_lang={lang!r}")
+
         personas_data = build_brand_personas(
             niche=data.get("niche", ""),
             target_audience=data.get("target_audience", ""),
             goals=data.get("goals", ""),
             comfort_level=data.get("comfort_level", ""),
             user=request.user if request.user.is_authenticated else None,
+            lang=lang,
         )
 
         return Response(personas_data, status=status.HTTP_200_OK)
@@ -51,9 +63,12 @@ class BrandSampleCaptionsView(APIView):
         data = serializer.validated_data
 
         platform = data.get("platform") or "instagram"
+        lang = get_request_lang(request)
 
         prompt_lines = [
             "You write short social media posts that match a brand persona.",
+            f"The captions you output MUST be written in the language with ISO code '{lang}'. "
+            "Do NOT output English if that code is not 'en'.",
             "",
             f"Persona name: {data.get('persona_name') or 'Creator'}",
             f"Vibe: {data.get('recommended_vibe') or 'Fun'}",
@@ -68,7 +83,6 @@ class BrandSampleCaptionsView(APIView):
             "Return ONLY JSON in this shape:",
             '{ "captions": ["...", "...", "..."] }',
         ]
-
         prompt = "\n".join(prompt_lines)
 
         completion = client.chat.completions.create(

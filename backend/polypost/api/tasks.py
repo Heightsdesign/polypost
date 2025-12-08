@@ -15,7 +15,7 @@ from datetime import datetime, timezone as dt_timezone
 from datetime import timedelta
 from .utils import send_postly_email, get_current_usage
 from django.core.mail import send_mail
-
+from.email_templates import normalize_lang_code, get_email_text
 
 
 @shared_task
@@ -60,6 +60,20 @@ def update_platform_timing_from_trends():
                 defaults={"engagement_rate": float(count)},
             )
 
+def get_user_email_lang_from_profile(user) -> str:
+    """
+    Best-effort way to get the user's email language from CreatorProfile.
+    Falls back to English.
+    """
+    try:
+        profile = CreatorProfile.objects.filter(user=user).first()
+        if profile and getattr(profile, "preferred_language", None):
+            return normalize_lang_code(profile.preferred_language)
+    except Exception:
+        pass
+    return "en"
+
+
 
 @shared_task
 def send_post_reminders():
@@ -83,7 +97,7 @@ def send_post_reminders():
 
 
 @shared_task
-def send_postly_email_task(to_email, subject, message_text, button_text, button_url):
+def send_postly_email_task(to_email, subject, message_text, button_text, button_url, lang: str = "en",):
     """
     Thin async wrapper around the HTML email helper.
     """
@@ -93,10 +107,9 @@ def send_postly_email_task(to_email, subject, message_text, button_text, button_
         message_text=message_text,
         button_text=button_text,
         button_url=button_url,
+        lang=lang,
         fail_silently=True,
     )
-
-
 @shared_task
 def send_login_alert_email(user_id, ip, user_agent):
     """
@@ -110,13 +123,18 @@ def send_login_alert_email(user_id, ip, user_agent):
 
     ts = timezone.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    msg = (
-        f"Hi {user.username},<br><br>"
-        "A login was detected on your Polypost account:<br><br>"
-        f"<b>IP:</b> {ip or 'unknown'}<br>"
-        f"<b>Device:</b> {user_agent or 'unknown'}<br>"
-        f"<b>Time:</b> {ts}<br><br>"
-        "If this wasn’t you, please reset your password immediately."
+    # Determine language from CreatorProfile (or whatever you use)
+    lang = get_user_email_lang_from_profile(user)  # falls back to "en"
+
+    # Get language-specific subject/message/button_text
+    email_copy = get_email_text("login_alert", lang)
+
+    # Fill the placeholders in the message
+    message_text = email_copy["message"].format(
+        username=user.username,
+        ip=ip or "unknown",
+        device=user_agent or "unknown",
+        timestamp=ts,
     )
 
     frontend = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
@@ -124,46 +142,44 @@ def send_login_alert_email(user_id, ip, user_agent):
 
     send_postly_email(
         to_email=user.email,
-        subject="Login alert for your Polypost account",
-        message_text=msg,
-        button_text="Reset password",
+        subject=email_copy["subject"],
+        message_text=message_text,
+        button_text=email_copy["button_text"],
         button_url=reset_url,
+        lang=lang,
         fail_silently=True,
     )
 
 
 @shared_task
 def send_weekly_summary_email():
-    """
-    Runs weekly via Celery Beat and sends a summary to all active users.
-    """
     User = get_user_model()
     frontend = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
 
-    # Keep it simple for MVP: all active users
     users = User.objects.filter(is_active=True)
 
     for user in users:
-        usage = get_current_usage(user)  # your MonthlyUsage helper
-
-        # If you track drafts via Draft model:
+        usage = get_current_usage(user)
         drafts_count = Draft.objects.filter(user=user).count() if hasattr(user, "drafts") else 0
 
-        msg = (
-            f"Hi {user.username},<br><br>"
-            "Here’s your content summary for this period:<br><br>"
-            f"- Ideas generated: <b>{usage.ideas_used}</b><br>"
-            f"- Captions generated: <b>{usage.captions_used}</b><br>"
-            f"- Drafts saved: <b>{drafts_count}</b><br><br>"
-            "Keep up the momentum — consistent posting wins 🎯"
+        lang = get_user_email_lang_from_profile(user)
+
+        email_copy = get_email_text("weekly_summary", lang)
+
+        message_text = email_copy["message"].format(
+            username=user.username,
+            ideas=usage.ideas_used,
+            captions=usage.captions_used,
+            drafts=drafts_count,
         )
 
         send_postly_email(
             to_email=user.email,
-            subject="Your weekly Polypost summary 📊",
-            message_text=msg,
-            button_text="Open dashboard",
+            subject=email_copy["subject"],
+            message_text=message_text,
+            button_text=email_copy["button_text"],
             button_url=f"{frontend}/dashboard",
+            lang=lang,
             fail_silently=True,
         )
 
@@ -205,17 +221,18 @@ def send_newsletter_email_task(blast_id: int, subject: str, body_text: str, html
     blast.recipients_count = count
     blast.save()
 
-
 @shared_task
 def check_upcoming_posts():
     now = timezone.now()
     one_hour_from_now = now + timedelta(hours=1)
 
     reminders = PostingReminder.objects.filter(
-        notified=False,                     # <-- REQUIRED FLAG
+        notified=False,
         scheduled_at__lte=one_hour_from_now,
-        scheduled_at__gte=now
+        scheduled_at__gte=now,
     )
+
+    frontend = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
 
     for reminder in reminders:
         user = reminder.user
@@ -223,20 +240,34 @@ def check_upcoming_posts():
         if not profile:
             continue
 
-        msg = f"Reminder: Your {reminder.platform.capitalize()} post is scheduled in 1 hour at {reminder.scheduled_at}."
+        lang = normalize_lang_code(getattr(profile, "preferred_language", None))
+
+        msg = (
+            f"Reminder: your {reminder.platform.capitalize()} post is scheduled "
+            f"in 1 hour at {reminder.scheduled_at:%Y-%m-%d %H:%M}.\n\n"
+            "You can review it from your Polypost dashboard."
+        )
 
         # ----- EMAIL NOTIFICATION -----
         if profile.notify_email:
+            lang = get_user_email_lang_from_profile(user)
+            email_copy = get_email_text("posting_reminder", lang)
+
+            message_text = email_copy["message"].format(
+                username=user.username,
+                platform=reminder.platform.capitalize(),
+                scheduled_time=reminder.scheduled_at.strftime("%Y-%m-%d %H:%M"),
+                note=reminder.note or "—",
+            )
+
             send_postly_email(
-                to=user.email,
-                subject="⏰ Posting Reminder",
-                template_name="posting_reminder.html",
-                context={
-                    "username": user.username,
-                    "platform": reminder.platform,
-                    "scheduled_at": reminder.scheduled_at,
-                    "note": reminder.note,
-                }
+                to_email=user.email,
+                subject=email_copy["subject"],
+                message_text=message_text,
+                button_text=email_copy["button_text"],
+                button_url=f"{frontend}/dashboard#scheduler",
+                lang=lang,
+                fail_silently=True,
             )
 
         # ----- IN-APP NOTIFICATION -----
@@ -244,19 +275,20 @@ def check_upcoming_posts():
             Notification.objects.create(
                 user=user,
                 message=msg,
-                url="/dashboard#scheduler"
+                url="/dashboard#scheduler",
             )
-        
+
+        # Always create an in-app notification (you already do)
         Notification.objects.create(
             user=reminder.user,
             kind="reminder",
-            message=f"Upcoming {reminder.platform} post at {reminder.scheduled_at:%Y-%m-%d %H:%M}: {reminder.note}",
+            message=(
+                f"Upcoming {reminder.platform} post at "
+                f"{reminder.scheduled_at:%Y-%m-%d %H:%M}: {reminder.note}"
+            ),
             related_reminder=reminder,
         )
 
-        
-        # always create an in-app notification
-       
         # Prevent duplicate notifications
         reminder.notified = True
         reminder.save()

@@ -58,7 +58,12 @@ const RegisterPage: React.FC = () => {
   const steps = [
     <StepAccount key="step-1" onNext={handleNext} />,
     <StepBasics key="step-2" onNext={handleNext} onBack={handleBack} />,
-    <StepTone key="step-3" onNext={handleNext} onBack={handleBack} />,
+    <StepTone
+      key="step-3"
+      onNext={handleNext}
+      onBack={handleBack}
+      preferredLanguage={formData.preferred_language || "en"}
+    />,
     <StepExtras
       key="step-4"
       onSubmit={handleSubmit}

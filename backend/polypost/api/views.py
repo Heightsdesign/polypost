@@ -54,10 +54,78 @@ from openai import OpenAI
 from datetime import date, datetime, timedelta
 
 from .scheduling_utils import generate_posting_suggestions, generate_ai_posting_plan
+from .email_templates import get_email_text, normalize_lang_code
 
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # or use decouple
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
+
+
+
+def _get_ip_from_request(request) -> str | None:
+    """
+    Best-effort IP extraction. Mirror what you do in DetectLanguageView.
+    """
+    xff = request.META.get("HTTP_X_FORWARDED_FOR")
+    if xff:
+        # first IP in the list
+        return xff.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR")
+
+
+def get_request_lang(request, explicit_lang: str | None = None) -> str:
+    """
+    Resolve language for AI outputs.
+
+    Priority:
+    1) explicit_lang (e.g. from request.data["preferred_language"])
+    2) CreatorProfile.preferred_language for authenticated user
+    3) IP-based detection (for anonymous users)
+    4) fallback to 'en'
+    """
+    lang = explicit_lang
+    profile_lang = None
+    ip_lang = None
+
+    user = getattr(request, "user", None)
+
+    # 1) Explicit param wins
+    if lang:
+        resolved = normalize_lang_code(lang)
+        print(f"[AI_LANG] explicit={lang!r} profile=None ip=None -> resolved={resolved}")
+        return resolved
+
+    # 2) CreatorProfile for logged-in users
+    if user is not None and user.is_authenticated:
+        profile = CreatorProfile.objects.filter(user=user).first()
+        if profile and getattr(profile, "preferred_language", None):
+            profile_lang = profile.preferred_language
+            resolved = normalize_lang_code(profile_lang)
+            print(f"[AI_LANG] explicit=None profile={profile_lang!r} ip=None -> resolved={resolved}")
+            return resolved
+
+    # 3) Anonymous / pre-signup: use IP detection
+    try:
+        ip = _get_ip_from_request(request)
+        if settings.DEBUG and not ip:
+            # Optional: you can force a sample IP here while debugging
+            # ip = "81.185.76.55"
+            pass
+
+        if ip:
+            country_code = get_country_code_from_ip(ip)
+            ip_lang_code = language_from_country_code(country_code)
+            ip_lang = ip_lang_code
+            resolved = normalize_lang_code(ip_lang_code)
+            print(f"[AI_LANG] explicit=None profile=None ip={ip!r}/{ip_lang!r} -> resolved={resolved}")
+            return resolved
+    except Exception as e:
+        print(f"[AI_LANG] IP-based detection failed: {e}")
+
+    # 4) Final fallback
+    resolved = "en"
+    print(f"[AI_LANG] explicit=None profile=None ip=None -> resolved={resolved}")
+    return resolved
 
 
 class RegisterView(views.APIView):
@@ -73,29 +141,29 @@ class RegisterView(views.APIView):
         user.is_active = False
         user.save()
 
+        # Figure out language from payload (preferred_language collected in StepBasics)
+        raw_lang = serializer.validated_data.get("preferred_language", "en")
+        from .email_templates import normalize_lang_code
+        lang = normalize_lang_code(raw_lang)
+
         # Generate confirmation values
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
 
-        # Build confirmation URL for the frontend
         frontend_base = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
         confirm_url = f"{frontend_base}/confirm-email?uid={uid}&token={token}"
 
-        subject = "Confirm your Polypost account"
-        message = (
-            "Welcome to Polypost!\n\n"
-            "Please confirm your email address by clicking the button below.\n\n"
-            "If you didn't create this account, you can ignore this email."
-        )
+        # Multilingual copy
+        email_copy = get_email_text("confirm_account", lang)
 
-        # Use the branded HTML template
         send_postly_email(
             to_email=user.email,
-            subject=subject,
-            message_text=message,
-            button_text="Confirm email",
+            subject=email_copy["subject"],
+            message_text=email_copy["message"],
+            button_text=email_copy["button_text"],
             button_url=confirm_url,
-            fail_silently=True,  # keep silent in MVP / dev
+            lang=lang,
+            fail_silently=True,
         )
 
         return Response(
@@ -105,7 +173,6 @@ class RegisterView(views.APIView):
             },
             status=status.HTTP_201_CREATED,
         )
-
 
 class MeProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = CreatorProfileSerializer
@@ -132,7 +199,6 @@ class MediaUploadViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-
 class GenerateCaptionView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -150,13 +216,30 @@ class GenerateCaptionView(views.APIView):
 
         platform = request.data.get("platform", "instagram")
 
+        # 🔥 NEW: resolve language from explicit param or profile
+        raw_lang = request.data.get("preferred_language")
+        lang = get_request_lang(request, raw_lang)
+
         profile = CreatorProfile.objects.filter(user=request.user).first()
-        prompt = build_caption_prompt(profile, media, platform=platform)
+        base_prompt = build_caption_prompt(profile, media, platform=platform)
+
+        prompt = (
+            base_prompt
+            + "\n\n"
+            + f"IMPORTANT: The final caption MUST be written in the language with ISO code '{lang}'. "
+              "Do NOT explain the language choice, just output the caption text."
+        )
 
         completion = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a social-media caption generator."},
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a social-media caption generator. "
+                        "You MUST always follow the requested language instructions."
+                    ),
+                },
                 {"role": "user", "content": prompt},
             ],
             max_tokens=80,
@@ -167,10 +250,8 @@ class GenerateCaptionView(views.APIView):
             media=media,
             defaults={"text": caption_text, "is_user_edited": False},
         )
-        # after successful generation:
         increment_usage(request.user, "caption", amount=CAPTIONS_PER_CALL)
         return Response(GeneratedCaptionSerializer(caption_obj).data, status=status.HTTP_201_CREATED)
-    
 
 class GenerateIdeasView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -1031,8 +1112,7 @@ class NotificationListView(views.APIView):
         qs = Notification.objects.filter(user=request.user).order_by("-created_at")[:50]
         serializer = NotificationSerializer(qs, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
-
+    
 class IdeaActionPlanView(views.APIView):
     """
     Turn a generated idea into a concrete execution plan.
@@ -1044,7 +1124,10 @@ class IdeaActionPlanView(views.APIView):
         profile = CreatorProfile.objects.filter(user=user).first()
 
         idea = request.data.get("idea") or {}
-        platform = request.data.get("platform", "instagram")
+        # fallback to profile's default_platform like in GenerateIdeasView
+        platform = request.data.get("platform") or getattr(
+            profile, "default_platform", "instagram"
+        )
 
         if not isinstance(idea, dict) or not idea:
             return Response(
@@ -1052,11 +1135,18 @@ class IdeaActionPlanView(views.APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        plan = generate_idea_action_plan(profile, idea, platform=platform)
+        # 🔥 resolve language (payload -> profile -> IP / default)
+        raw_lang = request.data.get("preferred_language")
+        lang = get_request_lang(request, raw_lang)
+
+        plan = generate_idea_action_plan(
+            profile=profile,
+            idea=idea,
+            platform=platform,
+            lang=lang,
+        )
 
         return Response(plan, status=status.HTTP_200_OK)
-
-
 class BioVariantsView(views.APIView):
     """
     POST /api/brand/bio-variants/
@@ -1085,6 +1175,9 @@ class BioVariantsView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
+        user = request.user
+        profile = CreatorProfile.objects.filter(user=user).first()
+
         base_bio = request.data.get("base_bio", "").strip()
         if not base_bio:
             return Response(
@@ -1093,14 +1186,20 @@ class BioVariantsView(views.APIView):
             )
 
         platform = request.data.get("platform") or "instagram"
-        lang = request.data.get("preferred_language") or "en"
+
+        # 🔥 Same logic as GenerateIdeasView / ActionPlan
+        profile_lang = getattr(profile, "preferred_language", None) or "en"
+        override_lang = request.data.get("preferred_language") or None
+        lang = (override_lang or profile_lang).lower()
+
+        print(f"[BIO_LANG] profile={profile_lang!r} override={override_lang!r} -> used={lang!r}")
+
         niche = request.data.get("niche") or ""
         target = request.data.get("target_audience") or ""
         vibe = request.data.get("vibe") or ""
         tone = request.data.get("tone") or ""
         stage = request.data.get("creator_stage") or ""
 
-        # Build a compact instruction string
         context_bits = []
         if niche:
             context_bits.append(f"niche: {niche}")
@@ -1131,14 +1230,16 @@ class BioVariantsView(views.APIView):
                             "- long_bio: a 3–4 line version with more detail.\n"
                             "- cta_bio: a version optimized around a strong call to action.\n"
                             "- fun_bio: a playful, witty version.\n"
-                            "Do not wrap it in any additional text, only valid JSON."
+                            "Do not wrap it in any additional text, only valid JSON.\n\n"
+                            f"IMPORTANT: All text in all fields MUST be written in the language "
+                            f"with ISO code '{lang}'. Do NOT use English if '{lang}' is not 'en'."
                         ),
                     },
                     {
                         "role": "user",
                         "content": (
                             f"Platform: {platform}\n"
-                            f"Language: {lang}\n"
+                            f"Language (ISO code): {lang}\n"
                             f"Context: {context_str}\n\n"
                             f"Base bio:\n{base_bio}"
                         ),
@@ -1146,14 +1247,11 @@ class BioVariantsView(views.APIView):
                 ],
             )
 
-            # ✅ Correct way with new OpenAI client:
             raw_content = completion.choices[0].message.content
 
-            # Safety: sometimes models may accidentally return non-JSON; guard it
             try:
                 parsed = json.loads(raw_content)
             except json.JSONDecodeError:
-                # Try to nudge things: not ideal, but better than 500
                 return Response(
                     {
                         "detail": "Model did not return valid JSON.",
@@ -1162,7 +1260,6 @@ class BioVariantsView(views.APIView):
                     status=status.HTTP_502_BAD_GATEWAY,
                 )
 
-            # Only keep expected keys
             result = {
                 "short_bio": parsed.get("short_bio", "").strip(),
                 "long_bio": parsed.get("long_bio", "").strip(),
@@ -1173,13 +1270,12 @@ class BioVariantsView(views.APIView):
             return Response(result, status=status.HTTP_200_OK)
 
         except Exception as e:
-            # Whatever wrapper you had around this error was producing:
-            # "OpenAI error: 'ChatCompletionMessage' object is not subscriptable"
             return Response(
                 {"detail": f"OpenAI error: {str(e)}"},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
-        
+
+
 class DetectLanguageView(views.APIView):
     permission_classes = [permissions.AllowAny]
 

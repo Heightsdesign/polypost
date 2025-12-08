@@ -23,9 +23,32 @@ from .serializers_password import (
 
 from .utils import send_postly_email
 from .tasks import send_login_alert_email, send_newsletter_email_task
+from .email_templates import get_email_text
 
 
 token_generator = PasswordResetTokenGenerator()
+
+def get_user_email_lang(user) -> str:
+  """
+  Best-effort lookup of the user's language for emails.
+  """
+  from api.email_templates import normalize_lang_code  # adjust import if needed
+
+  lang = None
+
+  # Try CreatorProfile.preferred_language if it exists
+  try:
+      profile = getattr(user, "creatorprofile", None)
+      if profile is not None:
+          lang = getattr(profile, "preferred_language", None)
+  except Exception:
+      lang = None
+
+  # Optionally: if you ever add user.preferred_language directly on User
+  if not lang:
+      lang = getattr(user, "preferred_language", None)
+
+  return normalize_lang_code(lang)
 
 
 class PasswordResetRequestView(APIView):
@@ -36,7 +59,7 @@ class PasswordResetRequestView(APIView):
         serializer.is_valid(raise_exception=True)
 
         email = serializer.validated_data["email"].strip().lower()
-        # Try to find the user. If none, we still return 200 to avoid user enumeration.
+
         try:
             user = User.objects.get(email__iexact=email)
         except User.DoesNotExist:
@@ -49,26 +72,21 @@ class PasswordResetRequestView(APIView):
         frontend_base = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
         reset_url = f"{frontend_base}/reset-password?uid={uid}&token={token}"
 
-        subject = "Reset your Polypost password"
-        message = (
-            "You requested a password reset for your Polypost account.\n\n"
-            "Click the button below to set a new password.\n\n"
-            "If you didn’t request this, you can safely ignore this email."
-        )
+        # Figure out language from user profile
+        lang = get_user_email_lang(user)
+        email_copy = get_email_text("password_reset", lang)
 
-        # Branded HTML email
         send_postly_email(
             to_email=email,
-            subject=subject,
-            message_text=message,
-            button_text="Reset password",
+            subject=email_copy["subject"],
+            message_text=email_copy["message"],
+            button_text=email_copy["button_text"],
             button_url=reset_url,
+            lang=lang,
             fail_silently=True,
         )
 
         return Response({"detail": "If that email exists, a reset link was sent."})
-
-
 
 class PasswordResetConfirmView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -128,7 +146,7 @@ class LoginView(TokenObtainPairView):
         send_login_alert_email.delay(user.id, ip, ua)
 
         return response
-    
+
 class EmailConfirmView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -152,29 +170,25 @@ class EmailConfirmView(APIView):
         user.is_active = True
         user.save()
 
-        # 📧 Send Welcome Email
-        
+        # Build dashboard URL
         frontend_base = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
         dashboard_url = f"{frontend_base}/dashboard"
 
-        welcome_subject = "Welcome to Polypost! 🎉"
-        welcome_message = (
-            "Your email has been confirmed and your Polypost account is ready to use!<br><br>"
-            "You're all set — start generating ideas, captions, and planning your content.\n\n"
-            "Click below to access your dashboard:"
-        )
+        # Language from user profile
+        lang = get_user_email_lang(user)
+        email_copy = get_email_text("welcome_after_confirm", lang)
 
         send_postly_email(
             to_email=user.email,
-            subject=welcome_subject,
-            message_text=welcome_message,
-            button_text="Go to Dashboard",
+            subject=email_copy["subject"],
+            message_text=email_copy["message"],
+            button_text=email_copy["button_text"],
             button_url=dashboard_url,
+            lang=lang,
             fail_silently=True,
         )
 
         return Response({"detail": "Email confirmed. You can now log in."}, status=200)
-
 
 class ChangePasswordView(APIView):
     permission_classes = [permissions.IsAuthenticated]

@@ -4,31 +4,44 @@ import os
 import requests
 import json
 
-from datetime import date
+from datetime import date, datetime
 from openai import OpenAI
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.utils.timezone import now
 
-from .email_templates import POSTLY_EMAIL_TEMPLATE
+from .email_templates import POSTLY_EMAIL_TEMPLATE, normalize_lang_code, EMAIL_FOOTER
 from .models import MonthlyUsage, Subscription, Plan
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 
-def render_postly_email_html(title: str, message: str, button_text: str, button_url: str) -> str:
+def render_postly_email_html(
+    title: str,
+    message: str,
+    button_text: str,
+    button_url: str,
+    lang: str = "en",
+) -> str:
     """
-    Simple string-based templating using the base POSTLY_EMAIL_TEMPLATE.
+    Render the branded Polypost email HTML, with language-aware footer.
     """
-    html = (
-        POSTLY_EMAIL_TEMPLATE
-        .replace("{{TITLE}}", title)
-        .replace("{{MESSAGE}}", message)
-        .replace("{{BUTTON_TEXT}}", button_text)
-        .replace("{{BUTTON_URL}}", button_url)
-        .replace("{{YEAR}}", str(now().year))
+    lang = normalize_lang_code(lang)
+    html = POSTLY_EMAIL_TEMPLATE
+
+    html = html.replace("{{LANG}}", lang or "en")
+    html = html.replace("{{TITLE}}", title)
+    # turn \n into <br/> for nice paragraphs
+    html = html.replace("{{MESSAGE}}", message.replace("\n", "<br/>"))
+    html = html.replace("{{BUTTON_URL}}", button_url)
+    html = html.replace("{{BUTTON_TEXT}}", button_text)
+    html = html.replace("{{YEAR}}", str(datetime.utcnow().year))
+    html = html.replace(
+        "{{FOOTER_LINE}}",
+        EMAIL_FOOTER.get(lang, EMAIL_FOOTER["en"]),
     )
+
     return html
 
 
@@ -38,24 +51,36 @@ def send_postly_email(
     message_text: str,
     button_text: str,
     button_url: str,
+    lang: str = "en",
     fail_silently: bool = True,
 ):
     """
     Reusable helper to send a branded Polypost HTML email with a button,
     plus a plain-text fallback.
     """
-    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@polypost-platform.com")
+    from_email = getattr(
+        settings,
+        "DEFAULT_FROM_EMAIL",
+        "no-reply@polypost-platform.com",
+    )
+
+    # normalise language
+    lang = normalize_lang_code(lang)
 
     html_body = render_postly_email_html(
         title=subject,
         message=message_text,
         button_text=button_text,
         button_url=button_url,
+        lang=lang,
     )
+
+    # plain text fallback with link appended
+    text_fallback = f"{message_text}\n\n{button_url}"
 
     email = EmailMultiAlternatives(
         subject=subject,
-        body=message_text,  # plain text fallback
+        body=text_fallback,
         from_email=from_email,
         to=[to_email],
     )
@@ -67,7 +92,7 @@ def send_postly_email(
         if not fail_silently:
             raise
         # in fail_silently=True mode, swallow SES/network errors
-        
+
 def get_trending_topics():
     """
     Fetch trending topics from an external API.
@@ -368,13 +393,27 @@ def user_has_active_subscription(user):
         return False
     return sub.is_active()
 
-
-def build_brand_personas(niche: str, target_audience: str, goals: str, comfort_level: str, user=None):
+def build_brand_personas(
+    niche: str,
+    target_audience: str,
+    goals: str,
+    comfort_level: str,
+    user=None,
+    lang: str = "en",
+):
     """
     Returns a dict: { "personas": [ { ... }, { ... }, { ... } ] }
     Each persona has: persona_name, brand_summary, recommended_vibe, recommended_tone,
                       niche, target_audience, content_pillars, brand_bio
     """
+
+    # ---- Normalise language a bit ----
+    lang = (lang or "en").split("-")[0].lower()
+    if lang not in {"en", "fr", "es", "pt"}:
+        lang = "en"
+
+    print(f"[BRAND_PERSONA_LANG] used={lang!r}")
+
     # Basic safety defaults
     niche = niche or "general creator"
     target_audience = target_audience or "social media followers"
@@ -385,20 +424,36 @@ def build_brand_personas(niche: str, target_audience: str, goals: str, comfort_l
         "You are a brand strategist for social media creators.",
         "Based on the details below, generate EXACTLY 3 different brand persona options.",
         "",
+        f"Language: {lang.upper()}",
+        (
+            "All FREE-TEXT fields must be written in this language "
+            "(persona_name, brand_summary, niche, target_audience, "
+            "content_pillars, brand_bio)."
+        ),
+        (
+            "HOWEVER, recommended_vibe and recommended_tone MUST stay in English "
+            "and match one of the following values exactly."
+        ),
+        "",
         f"Niche: {niche}",
         f"Target audience: {target_audience}",
         f"Goals: {goals}",
         f"Comfort level on camera / social: {comfort_level}",
         "",
+        "Allowed values for recommended_vibe:",
+        "- Fun, Chill, Bold, Educational, Luxury, Cozy, High-energy, Mysterious, Wholesome",
+        "Allowed values for recommended_tone:",
+        "- Casual, Professional, Playful, Flirty, Inspirational, Sarcastic, Empathetic, Confident",
+        "",
         "For each persona, include:",
         "- persona_name (short, catchy, like 'Bold Big Sis' or 'Cozy Expert')",
         "- brand_summary (2–3 sentences explaining vibe & value)",
-        "- recommended_vibe (must match one of: Fun, Chill, Bold, Educational, Luxury, Cozy, High-energy, Mysterious, Wholesome)",
-        "- recommended_tone (must match one of: Casual, Professional, Playful, Flirty, Inspirational, Sarcastic, Empathetic, Confident)",
-        "- niche (reuse or refine the niche)",
-        "- target_audience (refined audience description)",
-        "- content_pillars (array of 3–5 content topics)",
-        "- brand_bio (1–2 sentence social bio in first person)",
+        "- recommended_vibe (one of the allowed English values)",
+        "- recommended_tone (one of the allowed English values)",
+        "- niche (reuse or refine the niche, in the target language)",
+        "- target_audience (refined audience description, in the target language)",
+        "- content_pillars (array of 3–5 content topics, in the target language)",
+        "- brand_bio (1–2 sentence social bio in first person, in the target language)",
         "",
         "Return ONLY JSON in this shape (no markdown, no commentary):",
         "{",
@@ -421,15 +476,25 @@ def build_brand_personas(niche: str, target_audience: str, goals: str, comfort_l
 
     prompt = "\n".join(prompt_lines)
 
-    completion = client.chat.completions.create(
+    resp = client.chat.completions.create(
         model="gpt-4o-mini",
+        response_format={"type": "json_object"},
         messages=[
-            {"role": "system", "content": "You generate brand personas for creators."},
+            {
+                "role": "system",
+                "content": (
+                    "You generate brand personas for creators. "
+                    "You MUST respect the requested language for all free-text fields, "
+                    "and keep recommended_vibe/recommended_tone in the allowed English values."
+                ),
+            },
             {"role": "user", "content": prompt},
         ],
         max_tokens=900,
+        temperature=0.7,
     )
-    raw = completion.choices[0].message.content.strip()
+
+    raw = resp.choices[0].message.content.strip()
 
     try:
         data = json.loads(raw)
@@ -456,14 +521,12 @@ def build_brand_personas(niche: str, target_audience: str, goals: str, comfort_l
 
     return data
 
-# api/utils.py
-from django.conf import settings
-from openai import OpenAI
-
-client = OpenAI(api_key=settings.OPENAI_API_KEY)
-
-
-def generate_idea_action_plan(profile, idea: dict, platform: str = "instagram") -> dict:
+def generate_idea_action_plan(
+    profile,
+    idea: dict,
+    platform: str = "instagram",
+    lang: str = "en",
+) -> dict:
     """
     Given an idea dict like:
       {
@@ -473,8 +536,15 @@ def generate_idea_action_plan(profile, idea: dict, platform: str = "instagram") 
         "personal_twist": "..."
       }
 
-    return a JSON-ready dict describing an execution plan.
+    Return a JSON-ready dict describing an execution plan.
+    All free-text content is generated in the requested language.
     """
+
+    # ---- Minimal language normalisation ----
+    lang = (lang or "en").split("-")[0].lower()
+    if lang not in {"en", "fr", "es", "pt"}:
+        lang = "en"
+
     user_niche = getattr(profile, "niche", "") if profile else ""
     user_stage = getattr(profile, "creator_stage", "") if profile else ""
     target_audience = getattr(profile, "target_audience", "") if profile else ""
@@ -483,13 +553,16 @@ def generate_idea_action_plan(profile, idea: dict, platform: str = "instagram") 
         "You are an expert content coach for online creators. "
         "You turn abstract ideas into very concrete, step-by-step action plans. "
         "Always respond as a JSON object with short, practical steps. "
-        "No emojis, no hashtags, no long essays."
+        "No emojis, no hashtags, no long essays.\n\n"
+        f"IMPORTANT: All free-text fields in the JSON MUST be written in the language "
+        f"with ISO code '{lang}'. Do not output English if '{lang}' is not 'en'."
     )
 
     user_msg = {
         "role": "user",
         "content": (
             "Generate a practical execution plan for this content idea.\n\n"
+            f"Language: {lang.upper()}\n"
             f"Platform: {platform}\n"
             f"Niche: {user_niche or 'not specified'}\n"
             f"Creator stage: {user_stage or 'not specified'}\n"
@@ -521,8 +594,6 @@ def generate_idea_action_plan(profile, idea: dict, platform: str = "instagram") 
 
     content = resp.choices[0].message.content
     try:
-        import json
-
         data = json.loads(content)
     except Exception:
         # very defensive fallback
@@ -539,4 +610,3 @@ def generate_idea_action_plan(profile, idea: dict, platform: str = "instagram") 
         }
 
     return data
-

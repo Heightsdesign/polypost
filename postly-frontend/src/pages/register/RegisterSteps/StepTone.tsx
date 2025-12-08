@@ -24,6 +24,7 @@ type StepToneProps = {
     preferred_platforms: string[];
   }) => void;
   onBack: (data?: any) => void;
+  preferredLanguage?: string;
 };
 
 const VIBES = [
@@ -63,7 +64,11 @@ type BrandPersona = {
   brand_bio?: string;
 };
 
-const StepTone: React.FC<StepToneProps> = ({ onNext, onBack }) => {
+const StepTone: React.FC<StepToneProps> = ({
+  onNext,
+  onBack,
+  preferredLanguage,
+}) => {
   const { lang, t } = useLanguage();
 
   const [data, setData] = useState({
@@ -96,7 +101,8 @@ const StepTone: React.FC<StepToneProps> = ({ onNext, onBack }) => {
   const [brandError, setBrandError] = useState<string | null>(null);
 
   const [brandPersonas, setBrandPersonas] = useState<BrandPersona[]>([]);
-  const [selectedPersonaIndex, setSelectedPersonaIndex] = useState<number | null>(null);
+  const [selectedPersonaIndex, setSelectedPersonaIndex] =
+    useState<number | null>(null);
 
   const [sampleCaptions, setSampleCaptions] = useState<string[]>([]);
   const [captionsLoading, setCaptionsLoading] = useState(false);
@@ -115,12 +121,17 @@ const StepTone: React.FC<StepToneProps> = ({ onNext, onBack }) => {
     setSampleCaptions([]);
     setSelectedPersonaIndex(null);
 
+    // 👇 decide which language we send to backend
+    const effectiveLang =
+      preferredLanguage || data.content_languages || "en";
+
     try {
       const res = await api.post("/brand/persona/", {
         niche: brandForm.niche || data.niche,
         target_audience: brandForm.target_audience || data.target_audience,
         goals: brandForm.goals,
         comfort_level: brandForm.comfort_level,
+        preferred_language: effectiveLang,
       });
 
       const personas: BrandPersona[] = res.data.personas || [];
@@ -532,9 +543,13 @@ const StepTone: React.FC<StepToneProps> = ({ onNext, onBack }) => {
                         </p>
                       )}
                       <p className="text-[0.75rem] text-dark/70">
-                        <strong>{t("register_step_tone_brand_vibe_label")}</strong>{" "}
+                        <strong>
+                          {t("register_step_tone_brand_vibe_label")}
+                        </strong>{" "}
                         {p.recommended_vibe || "—"} ·{" "}
-                        <strong>{t("register_step_tone_brand_tone_label")}</strong>{" "}
+                        <strong>
+                          {t("register_step_tone_brand_tone_label")}
+                        </strong>{" "}
                         {p.recommended_tone || "—"}
                       </p>
                       {Array.isArray(p.content_pillars) &&

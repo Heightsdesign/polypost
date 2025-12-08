@@ -1,6 +1,7 @@
 // src/pages/UseCasesPage.tsx
 import { useEffect, useState } from "react";
 import api from "../api";
+import { useLanguage } from "../i18n/LanguageContext";
 
 interface UseCaseTemplate {
   id: number;
@@ -19,6 +20,13 @@ export default function UseCasesPage() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
 
+  // i18n – use UI language as default content language
+  const { lang } = useLanguage();
+  const SUPPORTED_CONTENT_LANGS = ["en", "fr", "es", "de", "pt", "it"] as const;
+  const effectiveLang = SUPPORTED_CONTENT_LANGS.includes(lang as any)
+    ? (lang as (typeof SUPPORTED_CONTENT_LANGS)[number])
+    : "en";
+
   // BRAND ASSISTANT (AI personas)
   const [brandForm, setBrandForm] = useState({
     niche: "",
@@ -29,7 +37,8 @@ export default function UseCasesPage() {
   const [brandPersonas, setBrandPersonas] = useState<any[]>([]);
   const [brandLoading, setBrandLoading] = useState(false);
   const [brandError, setBrandError] = useState<string | null>(null);
-  const [selectedPersonaIndex, setSelectedPersonaIndex] = useState<number | null>(null);
+  const [selectedPersonaIndex, setSelectedPersonaIndex] =
+    useState<number | null>(null);
 
   // 🔹 Bio variants from AI (for the currently refined persona)
   const [bioVariants, setBioVariants] = useState<{
@@ -55,6 +64,8 @@ export default function UseCasesPage() {
         target_audience: brandForm.target_audience,
         goals: brandForm.goals,
         comfort_level: brandForm.comfort_level,
+        // 👇 tell backend which language to use
+        preferred_language: effectiveLang,
       });
 
       // Support either:
@@ -114,7 +125,8 @@ export default function UseCasesPage() {
       const res = await api.post("/brand/bio-variants/", {
         base_bio: p.brand_bio,
         platform: p.main_platform || "instagram",
-        preferred_language: p.preferred_language || "en",
+        // 👇 prefer persona’s own language if present, else UI language
+        preferred_language: p.preferred_language || effectiveLang,
         niche: p.niche || brandForm.niche,
         target_audience: p.target_audience || brandForm.target_audience,
         vibe: p.recommended_vibe,
