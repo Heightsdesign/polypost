@@ -626,6 +626,74 @@ export const translations: Record<SupportedLang, Record<string, string>> = {
     upload_status_generating: "Generating caption...",
     upload_status_caption_ok: "Caption generated ✅",
     upload_status_caption_failed: "Caption generation failed.",
+    // Pricing
+    pricing_header_badge: "Pricing",
+    pricing_header_title: "Choose the plan that fits your creator journey",
+    pricing_header_subtitle:
+      "Start free, then upgrade when you're ready. Cancel anytime. All paid plans include higher limits for ideas, captions and scheduling.",
+
+    pricing_plan_free_name: "Free",
+    pricing_plan_free_description: "Perfect if you're just trying Postly out.",
+    pricing_plan_free_price: "$0",
+    pricing_plan_free_period: "Forever",
+    pricing_plan_free_feature_ideas: "Up to 15 AI ideas per month",
+    pricing_plan_free_feature_captions: "Up to 10 AI captions per month",
+    pricing_plan_free_feature_platforms: "1 main platform",
+    pricing_plan_free_feature_scheduler: "Basic manual scheduling & reminders",
+    pricing_plan_free_feature_storage: "Up to 20 drafts & 300 MB of uploads",
+    pricing_plan_free_cta: "Get started for free",
+
+    pricing_plan_monthly_name: "Pro – Monthly",
+    pricing_plan_monthly_description:
+      "Flexible month-to-month access for active creators.",
+    pricing_plan_monthly_price: "$12",
+    pricing_plan_monthly_period: "/month",
+    pricing_plan_monthly_highlight: "Most popular",
+    pricing_plan_monthly_feature_ideas: "Up to 150 AI ideas per month",
+    pricing_plan_monthly_feature_captions: "Up to 100 AI captions per month",
+    pricing_plan_monthly_feature_platforms: "Multi-platform support",
+    pricing_plan_monthly_feature_scheduler:
+      "Smart scheduler & cross-platform posting plan",
+    pricing_plan_monthly_feature_storage:
+      "Up to 300 drafts & 10 GB of uploads",
+
+    pricing_plan_quarterly_name: "Pro – Quarterly",
+    pricing_plan_quarterly_description: "Save when you pay every 3 months.",
+    pricing_plan_quarterly_price: "$30",
+    pricing_plan_quarterly_period: "Every 3 months (~$10/month)",
+    pricing_plan_quarterly_highlight: "Save ~17%",
+    pricing_plan_quarterly_feature_ideas: "Up to 450 AI ideas per 3 months",
+    pricing_plan_quarterly_feature_captions:
+      "Up to 300 AI captions per 3 months",
+    pricing_plan_quarterly_feature_platforms: "Multi-platform support",
+    pricing_plan_quarterly_feature_scheduler:
+      "Smart scheduler & cross-platform posting plan",
+    pricing_plan_quarterly_feature_storage:
+      "Up to 300 drafts & 10 GB of uploads",
+
+    pricing_plan_yearly_name: "Pro – Yearly",
+    pricing_plan_yearly_description: "Best value for serious creators.",
+    pricing_plan_yearly_price: "$99",
+    pricing_plan_yearly_period: "/year (~$8.25/month)",
+    pricing_plan_yearly_highlight: "Save ~31%",
+    pricing_plan_yearly_feature_ideas: "Up to 1,800 AI ideas per year",
+    pricing_plan_yearly_feature_captions: "Up to 1,200 AI captions per year",
+    pricing_plan_yearly_feature_platforms: "Multi-platform support",
+    pricing_plan_yearly_feature_scheduler:
+      "Smart scheduler & cross-platform posting plan",
+    pricing_plan_yearly_feature_storage:
+      "Up to 300 drafts & 10 GB of uploads",
+
+    pricing_error_not_configured:
+      "This plan is not configured yet. Please try again later.",
+    pricing_error_login_required: "Please log in to upgrade your plan.",
+    pricing_error_checkout_generic:
+      "Could not start checkout. Please try again.",
+    pricing_error_checkout_stripe:
+      "Stripe checkout could not be started.",
+
+    pricing_footer_note:
+      "Payments are handled securely by Stripe. You can cancel your subscription at any time.",
 
     },
 
@@ -1287,6 +1355,87 @@ export const translations: Record<SupportedLang, Record<string, string>> = {
     upload_status_caption_ok: "Légende générée ✅",
     upload_status_caption_failed:
       "Échec de la génération de la légende.",
+        // Pricing
+    pricing_header_badge: "Tarifs",
+    pricing_header_title:
+      "Choisissez la formule adaptée à votre parcours de créateur·rice",
+    pricing_header_subtitle:
+      "Commence gratuitement, puis passe à l’offre Pro quand tu es prêt·e. Résiliation à tout moment. Tous les forfaits payants incluent des limites plus élevées pour les idées, légendes et le planning.",
+
+    pricing_plan_free_name: "Gratuit",
+    pricing_plan_free_description:
+      "Parfait pour découvrir Postly sans pression.",
+    pricing_plan_free_price: "0 $",
+    pricing_plan_free_period: "Pour toujours",
+    pricing_plan_free_feature_ideas: "Jusqu’à 15 idées IA par mois",
+    pricing_plan_free_feature_captions: "Jusqu’à 10 légendes IA par mois",
+    pricing_plan_free_feature_platforms: "1 plateforme principale",
+    pricing_plan_free_feature_scheduler:
+      "Planning manuel de base et rappels",
+    pricing_plan_free_feature_storage:
+      "Jusqu’à 20 brouillons et 300 Mo d’uploads",
+    pricing_plan_free_cta: "Commencer gratuitement",
+
+    pricing_plan_monthly_name: "Pro – Mensuel",
+    pricing_plan_monthly_description:
+      "Accès flexible au mois pour les créateurs actifs.",
+    pricing_plan_monthly_price: "12 $",
+    pricing_plan_monthly_period: "/mois",
+    pricing_plan_monthly_highlight: "Le plus populaire",
+    pricing_plan_monthly_feature_ideas:
+      "Jusqu’à 150 idées IA par mois",
+    pricing_plan_monthly_feature_captions:
+      "Jusqu’à 100 légendes IA par mois",
+    pricing_plan_monthly_feature_platforms: "Multi-plateformes",
+    pricing_plan_monthly_feature_scheduler:
+      "Planificateur intelligent & plan de publication multi-plateformes",
+    pricing_plan_monthly_feature_storage:
+      "Jusqu’à 300 brouillons et 10 Go d’uploads",
+
+    pricing_plan_quarterly_name: "Pro – Trimestriel",
+    pricing_plan_quarterly_description:
+      "Économise en payant tous les 3 mois.",
+    pricing_plan_quarterly_price: "30 $",
+    pricing_plan_quarterly_period: "Tous les 3 mois (~10 $/mois)",
+    pricing_plan_quarterly_highlight: "Économise ~17 %",
+    pricing_plan_quarterly_feature_ideas:
+      "Jusqu’à 450 idées IA par 3 mois",
+    pricing_plan_quarterly_feature_captions:
+      "Jusqu’à 300 légendes IA par 3 mois",
+    pricing_plan_quarterly_feature_platforms: "Multi-plateformes",
+    pricing_plan_quarterly_feature_scheduler:
+      "Planificateur intelligent & plan de publication multi-plateformes",
+    pricing_plan_quarterly_feature_storage:
+      "Jusqu’à 300 brouillons et 10 Go d’uploads",
+
+    pricing_plan_yearly_name: "Pro – Annuel",
+    pricing_plan_yearly_description:
+      "Meilleur rapport qualité-prix pour les créateurs sérieux.",
+    pricing_plan_yearly_price: "99 $",
+    pricing_plan_yearly_period: "/an (~8,25 $/mois)",
+    pricing_plan_yearly_highlight: "Économise ~31 %",
+    pricing_plan_yearly_feature_ideas:
+      "Jusqu’à 1 800 idées IA par an",
+    pricing_plan_yearly_feature_captions:
+      "Jusqu’à 1 200 légendes IA par an",
+    pricing_plan_yearly_feature_platforms: "Multi-plateformes",
+    pricing_plan_yearly_feature_scheduler:
+      "Planificateur intelligent & plan de publication multi-plateformes",
+    pricing_plan_yearly_feature_storage:
+      "Jusqu’à 300 brouillons et 10 Go d’uploads",
+
+    pricing_error_not_configured:
+      "Cette formule n’est pas encore configurée. Réessaie plus tard.",
+    pricing_error_login_required:
+      "Connecte-toi pour pouvoir mettre ton abonnement à niveau.",
+    pricing_error_checkout_generic:
+      "Impossible de démarrer le paiement. Réessaie.",
+    pricing_error_checkout_stripe:
+      "Le paiement Stripe n’a pas pu être démarré.",
+
+    pricing_footer_note:
+      "Les paiements sont gérés de façon sécurisée par Stripe. Tu peux annuler ton abonnement à tout moment.",
+
 
     },
 
@@ -1949,6 +2098,88 @@ export const translations: Record<SupportedLang, Record<string, string>> = {
     upload_status_caption_ok: "Leyenda generada ✅",
     upload_status_caption_failed:
       "No se pudo generar la leyenda.",
+        // Pricing
+    pricing_header_badge: "Precios",
+    pricing_header_title:
+      "Elige el plan que encaja con tu camino como creador/a",
+    pricing_header_subtitle:
+      "Empieza gratis y pasa al plan Pro cuando estés listo/a. Cancela en cualquier momento. Todos los planes de pago incluyen límites más altos para ideas, textos y planificación.",
+
+    pricing_plan_free_name: "Gratis",
+    pricing_plan_free_description:
+      "Perfecto para probar Postly sin compromiso.",
+    pricing_plan_free_price: "0 $",
+    pricing_plan_free_period: "Para siempre",
+    pricing_plan_free_feature_ideas:
+      "Hasta 15 ideas IA al mes",
+    pricing_plan_free_feature_captions:
+      "Hasta 10 textos IA al mes",
+    pricing_plan_free_feature_platforms: "1 plataforma principal",
+    pricing_plan_free_feature_scheduler:
+      "Planificación manual básica y recordatorios",
+    pricing_plan_free_feature_storage:
+      "Hasta 20 borradores y 300 MB de archivos subidos",
+    pricing_plan_free_cta: "Empieza gratis",
+
+    pricing_plan_monthly_name: "Pro – Mensual",
+    pricing_plan_monthly_description:
+      "Acceso mes a mes para creadores activos.",
+    pricing_plan_monthly_price: "12 $",
+    pricing_plan_monthly_period: "/mes",
+    pricing_plan_monthly_highlight: "El más popular",
+    pricing_plan_monthly_feature_ideas:
+      "Hasta 150 ideas IA al mes",
+    pricing_plan_monthly_feature_captions:
+      "Hasta 100 textos IA al mes",
+    pricing_plan_monthly_feature_platforms: "Soporte multi-plataforma",
+    pricing_plan_monthly_feature_scheduler:
+      "Calendario inteligente y plan de publicación multi-plataforma",
+    pricing_plan_monthly_feature_storage:
+      "Hasta 300 borradores y 10 GB de archivos subidos",
+
+    pricing_plan_quarterly_name: "Pro – Trimestral",
+    pricing_plan_quarterly_description:
+      "Ahorra pagando cada 3 meses.",
+    pricing_plan_quarterly_price: "30 $",
+    pricing_plan_quarterly_period: "Cada 3 meses (~10 $/mes)",
+    pricing_plan_quarterly_highlight: "Ahorra ~17 %",
+    pricing_plan_quarterly_feature_ideas:
+      "Hasta 450 ideas IA por 3 meses",
+    pricing_plan_quarterly_feature_captions:
+      "Hasta 300 textos IA por 3 meses",
+    pricing_plan_quarterly_feature_platforms: "Soporte multi-plataforma",
+    pricing_plan_quarterly_feature_scheduler:
+      "Calendario inteligente y plan de publicación multi-plataforma",
+    pricing_plan_quarterly_feature_storage:
+      "Hasta 300 borradores y 10 GB de archivos subidos",
+
+    pricing_plan_yearly_name: "Pro – Anual",
+    pricing_plan_yearly_description:
+      "La mejor opción para creadores serios.",
+    pricing_plan_yearly_price: "99 $",
+    pricing_plan_yearly_period: "/año (~8,25 $/mes)",
+    pricing_plan_yearly_highlight: "Ahorra ~31 %",
+    pricing_plan_yearly_feature_ideas:
+      "Hasta 1.800 ideas IA al año",
+    pricing_plan_yearly_feature_captions:
+      "Hasta 1.200 textos IA al año",
+    pricing_plan_yearly_feature_platforms: "Soporte multi-plataforma",
+    pricing_plan_yearly_feature_scheduler:
+      "Calendario inteligente y plan de publicación multi-plataforma",
+    pricing_plan_yearly_feature_storage:
+      "Hasta 300 borradores y 10 GB de archivos subidos",
+
+    pricing_error_not_configured:
+      "Este plan todavía no está configurado. Inténtalo de nuevo más tarde.",
+    pricing_error_login_required:
+      "Inicia sesión para poder mejorar tu plan.",
+    pricing_error_checkout_generic:
+      "No se pudo iniciar el pago. Inténtalo de nuevo.",
+    pricing_error_checkout_stripe:
+      "No se pudo iniciar el proceso de pago con Stripe.",
+
+    pricing_footer_note:
+      "Los pagos se procesan de forma segura con Stripe. Puedes cancelar tu suscripción en cualquier momento.",
 
 
       },
@@ -2611,6 +2842,89 @@ export const translations: Record<SupportedLang, Record<string, string>> = {
     upload_status_caption_ok: "Legenda gerada ✅",
     upload_status_caption_failed:
       "Falha ao gerar a legenda.",
+        // Pricing
+    pricing_header_badge: "Planos",
+    pricing_header_title:
+      "Escolha o plano que combina com a sua jornada de criador(a)",
+    pricing_header_subtitle:
+      "Comece grátis e faça upgrade para o Pro quando estiver pronto(a). Cancele a qualquer momento. Todos os planos pagos incluem limites maiores para ideias, legendas e agendamentos.",
+
+    pricing_plan_free_name: "Gratuito",
+    pricing_plan_free_description:
+      "Perfeito para testar o Postly sem compromisso.",
+    pricing_plan_free_price: "US$ 0",
+    pricing_plan_free_period: "Para sempre",
+    pricing_plan_free_feature_ideas:
+      "Até 15 ideias com IA por mês",
+    pricing_plan_free_feature_captions:
+      "Até 10 legendas com IA por mês",
+    pricing_plan_free_feature_platforms: "1 plataforma principal",
+    pricing_plan_free_feature_scheduler:
+      "Agendamento manual básico e lembretes",
+    pricing_plan_free_feature_storage:
+      "Até 20 rascunhos e 300 MB em uploads",
+    pricing_plan_free_cta: "Começar grátis",
+
+    pricing_plan_monthly_name: "Pro – Mensal",
+    pricing_plan_monthly_description:
+      "Acesso mês a mês para criadores ativos.",
+    pricing_plan_monthly_price: "US$ 12",
+    pricing_plan_monthly_period: "/mês",
+    pricing_plan_monthly_highlight: "Mais usado",
+    pricing_plan_monthly_feature_ideas:
+      "Até 150 ideias com IA por mês",
+    pricing_plan_monthly_feature_captions:
+      "Até 100 legendas com IA por mês",
+    pricing_plan_monthly_feature_platforms: "Suporte multi-plataforma",
+    pricing_plan_monthly_feature_scheduler:
+      "Agendador inteligente e plano de postagem multi-plataforma",
+    pricing_plan_monthly_feature_storage:
+      "Até 300 rascunhos e 10 GB em uploads",
+
+    pricing_plan_quarterly_name: "Pro – Trimestral",
+    pricing_plan_quarterly_description:
+      "Economize pagando a cada 3 meses.",
+    pricing_plan_quarterly_price: "US$ 30",
+    pricing_plan_quarterly_period: "A cada 3 meses (~US$ 10/mês)",
+    pricing_plan_quarterly_highlight: "Economize ~17 %",
+    pricing_plan_quarterly_feature_ideas:
+      "Até 450 ideias com IA a cada 3 meses",
+    pricing_plan_quarterly_feature_captions:
+      "Até 300 legendas com IA a cada 3 meses",
+    pricing_plan_quarterly_feature_platforms: "Suporte multi-plataforma",
+    pricing_plan_quarterly_feature_scheduler:
+      "Agendador inteligente e plano de postagem multi-plataforma",
+    pricing_plan_quarterly_feature_storage:
+      "Até 300 rascunhos e 10 GB em uploads",
+
+    pricing_plan_yearly_name: "Pro – Anual",
+    pricing_plan_yearly_description:
+      "Melhor custo-benefício para criadores sérios.",
+    pricing_plan_yearly_price: "US$ 99",
+    pricing_plan_yearly_period: "/ano (~US$ 8,25/mês)",
+    pricing_plan_yearly_highlight: "Economize ~31 %",
+    pricing_plan_yearly_feature_ideas:
+      "Até 1.800 ideias com IA por ano",
+    pricing_plan_yearly_feature_captions:
+      "Até 1.200 legendas com IA por ano",
+    pricing_plan_yearly_feature_platforms: "Suporte multi-plataforma",
+    pricing_plan_yearly_feature_scheduler:
+      "Agendador inteligente e plano de postagem multi-plataforma",
+    pricing_plan_yearly_feature_storage:
+      "Até 300 rascunhos e 10 GB em uploads",
+
+    pricing_error_not_configured:
+      "Este plano ainda não está configurado. Tente novamente mais tarde.",
+    pricing_error_login_required:
+      "Entre na sua conta para fazer upgrade do plano.",
+    pricing_error_checkout_generic:
+      "Não foi possível iniciar o pagamento. Tente novamente.",
+    pricing_error_checkout_stripe:
+      "Não foi possível iniciar o pagamento com a Stripe.",
+
+    pricing_footer_note:
+      "Os pagamentos são processados com segurança pela Stripe. Você pode cancelar a assinatura a qualquer momento.",
+
 
     },
 };

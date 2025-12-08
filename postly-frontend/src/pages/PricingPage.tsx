@@ -2,9 +2,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api";
+import { t } from "../i18n/translations";
+import { useLanguage } from "../i18n/LanguageContext";
 
 type PlanCard = {
-  id?: number;               // DB id for paid plans
+  id?: number; // DB id for paid plans
   slug: string;
   name: string;
   priceLabel: string;
@@ -15,88 +17,92 @@ type PlanCard = {
   isFree?: boolean;
 };
 
-const plans: PlanCard[] = [
-  {
-    slug: "free",
-    name: "Free",
-    priceLabel: "$0",
-    periodLabel: "Forever",
-    description: "Perfect if you're just trying Postly out.",
-    features: [
-      "20 ideas per month",
-      "10 AI captions per month",
-      "1 main platform",
-      "Basic scheduling",
-    ],
-    isFree: true,
-  },
-  {
-    slug: "monthly",
-    name: "Monthly",
-    priceLabel: "$12",
-    periodLabel: "/month",
-    description: "Flexible month-to-month access.",
-    features: [
-      "300 ideas per month",
-      "200 AI captions per month",
-      "Multi-platform support",
-      "Smart posting times",
-    ],
-    highlight: "Most popular",
-    // ⚠️ replace with the real Plan.id from your DB
-    id: 2,
-  },
-  {
-    slug: "quarterly",
-    name: "3-Month Plan",
-    priceLabel: "$32.40",
-    periodLabel: "every 3 months",
-    description: "Save 10% when you pay quarterly.",
-    features: [
-      "900 ideas per 3 months",
-      "600 AI captions per 3 months",
-      "Multi-platform support",
-      "Priority support",
-    ],
-    highlight: "Save 10%",
-    // ⚠️ replace with the real Plan.id from your DB
-    id: 3,
-  },
-  {
-    slug: "yearly",
-    name: "Yearly",
-    priceLabel: "$115.20",
-    periodLabel: "/year",
-    description: "Best value for serious creators.",
-    features: [
-      "3600 ideas per year",
-      "2400 AI captions per year",
-      "Multi-platform support",
-      "Priority support",
-      "Early access to new features",
-    ],
-    highlight: "Save 20%",
-    // ⚠️ replace with the real Plan.id from your DB
-    id: 4,
-  },
-];
-
 export default function PricingPage() {
+  const { lang } = useLanguage();
   const [loadingSlug, setLoadingSlug] = useState<string | null>(null);
   const [error, setError] = useState("");
+
+  // Build plans with translated labels
+  const plans: PlanCard[] = [
+    {
+      slug: "free",
+      name: t(lang, "pricing_plan_free_name"),
+      priceLabel: t(lang, "pricing_plan_free_price"),
+      periodLabel: t(lang, "pricing_plan_free_period"),
+      description: t(lang, "pricing_plan_free_description"),
+      features: [
+        t(lang, "pricing_plan_free_feature_ideas"),
+        t(lang, "pricing_plan_free_feature_captions"),
+        t(lang, "pricing_plan_free_feature_platforms"),
+        t(lang, "pricing_plan_free_feature_scheduler"),
+        t(lang, "pricing_plan_free_feature_storage"),
+      ],
+      isFree: true,
+    },
+    {
+      slug: "monthly",
+      name: t(lang, "pricing_plan_monthly_name"),
+      priceLabel: t(lang, "pricing_plan_monthly_price"),
+      periodLabel: t(lang, "pricing_plan_monthly_period"),
+      description: t(lang, "pricing_plan_monthly_description"),
+      features: [
+        t(lang, "pricing_plan_monthly_feature_ideas"),
+        t(lang, "pricing_plan_monthly_feature_captions"),
+        t(lang, "pricing_plan_monthly_feature_platforms"),
+        t(lang, "pricing_plan_monthly_feature_scheduler"),
+        t(lang, "pricing_plan_monthly_feature_storage"),
+      ],
+      highlight: t(lang, "pricing_plan_monthly_highlight"),
+      // ⚠️ replace with the real Plan.id from your DB
+      id: 2,
+    },
+    {
+      slug: "quarterly",
+      name: t(lang, "pricing_plan_quarterly_name"),
+      priceLabel: t(lang, "pricing_plan_quarterly_price"),
+      periodLabel: t(lang, "pricing_plan_quarterly_period"),
+      description: t(lang, "pricing_plan_quarterly_description"),
+      features: [
+        t(lang, "pricing_plan_quarterly_feature_ideas"),
+        t(lang, "pricing_plan_quarterly_feature_captions"),
+        t(lang, "pricing_plan_quarterly_feature_platforms"),
+        t(lang, "pricing_plan_quarterly_feature_scheduler"),
+        t(lang, "pricing_plan_quarterly_feature_storage"),
+      ],
+      highlight: t(lang, "pricing_plan_quarterly_highlight"),
+      // ⚠️ replace with the real Plan.id from your DB
+      id: 3,
+    },
+    {
+      slug: "yearly",
+      name: t(lang, "pricing_plan_yearly_name"),
+      priceLabel: t(lang, "pricing_plan_yearly_price"),
+      periodLabel: t(lang, "pricing_plan_yearly_period"),
+      description: t(lang, "pricing_plan_yearly_description"),
+      features: [
+        t(lang, "pricing_plan_yearly_feature_ideas"),
+        t(lang, "pricing_plan_yearly_feature_captions"),
+        t(lang, "pricing_plan_yearly_feature_platforms"),
+        t(lang, "pricing_plan_yearly_feature_scheduler"),
+        t(lang, "pricing_plan_yearly_feature_storage"),
+      ],
+      highlight: t(lang, "pricing_plan_yearly_highlight"),
+      // ⚠️ replace with the real Plan.id from your DB
+      id: 4,
+    },
+  ];
 
   async function handleCheckout(plan: PlanCard) {
     setError("");
 
     if (plan.isFree) {
-      // Free plan: just send them to registration
-      // (they'll be assigned Free by default / via backend logic)
+      // Free plan: redirect to registration
       window.location.href = "/register";
       return;
     }
 
     if (!plan.id) {
-      setError("This plan is not configured yet. Please try again later.");
+      setError(t(lang, "pricing_error_not_configured"));
       return;
     }
 
@@ -110,17 +116,16 @@ export default function PricingPage() {
       if (res.data.checkout_url) {
         window.location.href = res.data.checkout_url;
       } else if (res.data.detail) {
-        // e.g. Free plan or some non-redirect flow
         setError(res.data.detail);
       } else {
-        setError("Could not start checkout. Please try again.");
+        setError(t(lang, "pricing_error_checkout_generic"));
       }
     } catch (err: any) {
       console.error(err);
       if (err?.response?.status === 401) {
-        setError("Please log in to upgrade your plan.");
+        setError(t(lang, "pricing_error_login_required"));
       } else {
-        setError("Stripe checkout could not be started.");
+        setError(t(lang, "pricing_error_checkout_stripe"));
       }
     } finally {
       setLoadingSlug(null);
@@ -146,14 +151,13 @@ export default function PricingPage() {
         {/* Header */}
         <header className="text-center mb-10 md:mb-14">
           <p className="text-[11px] font-semibold tracking-[0.2em] uppercase text-purple/80 mb-2">
-            Pricing
+            {t(lang, "pricing_header_badge")}
           </p>
           <h1 className="text-2xl md:text-3xl font-extrabold text-dark mb-3">
-            Choose the <span className="text-purple">plan</span> that fits your creator journey
+            {t(lang, "pricing_header_title")}
           </h1>
           <p className="text-sm md:text-[0.95rem] text-dark/70 max-w-2xl mx-auto">
-            Start free, then upgrade when you&apos;re ready. Cancel anytime. All paid plans include
-            unlimited projects and access to our best AI tools.
+            {t(lang, "pricing_header_subtitle")}
           </p>
         </header>
 
@@ -212,7 +216,7 @@ export default function PricingPage() {
                     to="/register"
                     className="inline-flex items-center justify-center w-full px-4 py-2.5 rounded-2xl text-sm font-semibold border border-purple/20 text-purple bg-white hover:bg-purple/5 transition-all"
                   >
-                    Get started for free
+                    {t(lang, "pricing_plan_free_cta")}
                   </Link>
                 ) : (
                   <button
@@ -231,7 +235,7 @@ export default function PricingPage() {
 
         {/* Small reassurance footnote */}
         <p className="mt-8 text-[11px] text-center text-dark/50">
-          Payments are handled securely by Stripe. You can cancel your subscription at any time.
+          {t(lang, "pricing_footer_note")}
         </p>
       </div>
     </div>
