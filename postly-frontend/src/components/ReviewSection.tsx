@@ -2,6 +2,8 @@
 import React, { useEffect, useState } from "react";
 import { fetchReviews, submitReview } from "../api";
 import type { ReviewPayload } from "../api";
+import { useLanguage } from "../i18n/LanguageContext";
+
 type Review = {
   id: number;
   username: string | null;
@@ -20,6 +22,8 @@ type ReviewsResponse = {
 };
 
 const ReviewsSection: React.FC = () => {
+  const { t } = useLanguage();
+
   const [data, setData] = useState<ReviewsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -55,20 +59,23 @@ const ReviewsSection: React.FC = () => {
     setSuccess("");
 
     try {
-      const payload: ReviewPayload = { rating, comment, title: title || undefined };
+      const payload: ReviewPayload = {
+        rating,
+        comment,
+        title: title || undefined,
+      };
       await submitReview(payload);
 
-      setSuccess("Thanks for your feedback! 💜");
+      setSuccess(t("reviews_success"));
       setTitle("");
       setComment("");
       setRating(5);
 
-      // reload list
       const res = await fetchReviews();
       setData(res.data as ReviewsResponse);
     } catch (err) {
       console.error(err);
-      setError("Could not send your review. Please try again.");
+      setError(t("reviews_error"));
     } finally {
       setSubmitting(false);
     }
@@ -79,10 +86,10 @@ const ReviewsSection: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-5">
         <div>
           <h2 className="text-base md:text-lg font-semibold text-dark mb-1">
-            What creators say
+            {t("reviews_title")}
           </h2>
           <p className="text-xs md:text-sm text-dark/60">
-            Help us improve Postly and see what others think.
+            {t("reviews_subtitle")}
           </p>
         </div>
 
@@ -94,18 +101,23 @@ const ReviewsSection: React.FC = () => {
           </div>
           <div className="text-xs md:text-sm text-dark/70">
             <span className="font-semibold">{avg.toFixed(1)}</span> / 5 ·{" "}
-            <span>{total} review{total === 1 ? "" : "s"}</span>
+            <span>
+              {total}{" "}
+              {total === 1
+                ? t("reviews_summary_review_singular")
+                : t("reviews_summary_review_plural")}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* list of a few latest reviews */}
+      {/* latest reviews */}
       <div className="space-y-3 mb-6 max-h-60 overflow-y-auto pr-1">
-        {loading && <p className="text-xs text-dark/50">Loading reviews…</p>}
+        {loading && (
+          <p className="text-xs text-dark/50">{t("reviews_loading")}</p>
+        )}
         {!loading && data?.results.length === 0 && (
-          <p className="text-xs text-dark/50">
-            No reviews yet. Be the first to share your feedback!
-          </p>
+          <p className="text-xs text-dark/50">{t("reviews_empty")}</p>
         )}
         {data?.results.slice(0, 5).map((r) => (
           <div
@@ -115,7 +127,7 @@ const ReviewsSection: React.FC = () => {
             <div className="flex items-center justify-between gap-2 mb-1">
               <div className="flex items-center gap-2">
                 <span className="text-[0.7rem] rounded-full bg-purple/10 text-purple px-2 py-[2px]">
-                  {r.username || "anonymous"}
+                  {r.username || t("reviews_username_anonymous")}
                 </span>
                 <span className="text-yellow-400 text-sm">
                   {"★".repeat(r.rating)}
@@ -130,7 +142,9 @@ const ReviewsSection: React.FC = () => {
                 {r.title}
               </p>
             )}
-            <p className="text-[0.78rem] md:text-xs text-dark/75">{r.comment}</p>
+            <p className="text-[0.78rem] md:text-xs text-dark/75">
+              {r.comment}
+            </p>
           </div>
         ))}
       </div>
@@ -153,7 +167,9 @@ const ReviewsSection: React.FC = () => {
 
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2">
-            <span className="text-dark/70">Your rating:</span>
+            <span className="text-dark/70">
+              {t("reviews_rating_label")}
+            </span>
             <select
               value={rating}
               onChange={(e) => setRating(Number(e.target.value))}
@@ -161,7 +177,7 @@ const ReviewsSection: React.FC = () => {
             >
               {[5, 4, 3, 2, 1].map((n) => (
                 <option key={n} value={n}>
-                  {n} star{n === 1 ? "" : "s"}
+                  {n} ★
                 </option>
               ))}
             </select>
@@ -171,7 +187,7 @@ const ReviewsSection: React.FC = () => {
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Optional title (e.g. 'Super useful for IG')"
+            placeholder={t("reviews_title_placeholder")}
             className="flex-1 min-w-[180px] rounded-2xl border border-purple/20 bg-white/90 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple/40"
           />
         </div>
@@ -179,7 +195,7 @@ const ReviewsSection: React.FC = () => {
         <textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="Share how Postly helps (or what we could improve)…"
+          placeholder={t("reviews_comment_placeholder")}
           rows={3}
           className="w-full rounded-2xl border border-purple/20 bg-white/90 px-3 py-2 text-xs md:text-sm resize-y focus:outline-none focus:ring-2 focus:ring-purple/40"
         />
@@ -189,7 +205,9 @@ const ReviewsSection: React.FC = () => {
           disabled={submitting || !comment.trim()}
           className="inline-flex items-center justify-center px-4 py-2 rounded-2xl text-xs md:text-sm font-semibold text-white bg-gradient-to-r from-purple to-pink shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {submitting ? "Sending…" : "Submit review"}
+          {submitting
+            ? t("reviews_button_sending")
+            : t("reviews_button_submit")}
         </button>
       </form>
     </section>

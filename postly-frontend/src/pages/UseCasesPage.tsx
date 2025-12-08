@@ -16,16 +16,15 @@ interface UseCaseTemplate {
 }
 
 export default function UseCasesPage() {
+  const { lang, t } = useLanguage();
+
+  // for AI calls we only support these 4
+  const effectiveLang =
+    ["en", "fr", "es", "pt"].includes(lang as any) ? (lang as any) : "en";
+
   const [templates, setTemplates] = useState<UseCaseTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
-
-  // i18n – use UI language as default content language
-  const { lang } = useLanguage();
-  const SUPPORTED_CONTENT_LANGS = ["en", "fr", "es", "de", "pt", "it"] as const;
-  const effectiveLang = SUPPORTED_CONTENT_LANGS.includes(lang as any)
-    ? (lang as (typeof SUPPORTED_CONTENT_LANGS)[number])
-    : "en";
 
   // BRAND ASSISTANT (AI personas)
   const [brandForm, setBrandForm] = useState({
@@ -64,8 +63,7 @@ export default function UseCasesPage() {
         target_audience: brandForm.target_audience,
         goals: brandForm.goals,
         comfort_level: brandForm.comfort_level,
-        // 👇 tell backend which language to use
-        preferred_language: effectiveLang,
+        preferred_language: effectiveLang, // 🔹 ensure multilingual personas
       });
 
       // Support either:
@@ -78,7 +76,7 @@ export default function UseCasesPage() {
       setBrandPersonas(personas);
     } catch (err) {
       console.error(err);
-      setBrandError("⚠️ Could not generate brand personas. Please try again.");
+      setBrandError(t("usecases_brand_error"));
     } finally {
       setBrandLoading(false);
     }
@@ -99,11 +97,11 @@ export default function UseCasesPage() {
           persona.target_audience || brandForm.target_audience || "",
       });
 
-      setToast("🎉 Brand persona applied to your profile!");
+      setToast(t("usecases_toast_persona_applied"));
       setTimeout(() => setToast(null), 3500);
     } catch (err) {
       console.error(err);
-      setToast("⚠️ Could not apply persona. Please try again.");
+      setToast(t("usecases_toast_persona_apply_error"));
       setTimeout(() => setToast(null), 3500);
     }
   }
@@ -112,7 +110,7 @@ export default function UseCasesPage() {
   async function refineBio(idx: number) {
     const p = brandPersonas[idx];
     if (!p || !p.brand_bio) {
-      setToast("No base bio to refine for this persona.");
+      setToast(t("usecases_bio_no_base"));
       setTimeout(() => setToast(null), 2500);
       return;
     }
@@ -125,8 +123,7 @@ export default function UseCasesPage() {
       const res = await api.post("/brand/bio-variants/", {
         base_bio: p.brand_bio,
         platform: p.main_platform || "instagram",
-        // 👇 prefer persona’s own language if present, else UI language
-        preferred_language: p.preferred_language || effectiveLang,
+        preferred_language: effectiveLang, // 🔹 use current UI/AI language
         niche: p.niche || brandForm.niche,
         target_audience: p.target_audience || brandForm.target_audience,
         vibe: p.recommended_vibe,
@@ -137,7 +134,7 @@ export default function UseCasesPage() {
       setBioVariants(res.data);
     } catch (err) {
       console.error(err);
-      setToast("⚠️ Could not refine bio.");
+      setToast(t("usecases_bio_refine_error"));
       setTimeout(() => setToast(null), 3500);
     } finally {
       setBioLoading(false);
@@ -147,7 +144,7 @@ export default function UseCasesPage() {
   function copyBio(text?: string) {
     if (!text) return;
     navigator.clipboard.writeText(text).catch(() => {});
-    setToast("📋 Bio copied to clipboard");
+    setToast(t("usecases_bio_copied_toast"));
     setTimeout(() => setToast(null), 2000);
   }
 
@@ -168,6 +165,7 @@ export default function UseCasesPage() {
   async function applyTemplate(id: number) {
     try {
       await api.post("/use-cases/apply/", { template_id: id });
+      // (You can add dedicated i18n keys later if you want)
       setToast("🎉 Preset applied! Your vibe, tone & niche were updated.");
       setTimeout(() => setToast(null), 3500);
     } catch (err) {
@@ -224,34 +222,31 @@ export default function UseCasesPage() {
         {/* Header + explainer */}
         <header className="mb-10">
           <p className="text-xs font-semibold tracking-[0.2em] uppercase text-purple/80 mb-2">
-            Use cases
+            {t("usecases_header_label")}
           </p>
           <h1 className="text-2xl md:text-3xl font-extrabold text-dark mb-3">
-            Make Postly <span className="text-purple">work for your style</span>
+            {t("usecases_title_main")}{" "}
+            <span className="text-purple">{t("usecases_title_highlight")}</span>
           </h1>
           <p className="text-sm md:text-[0.96rem] text-dark/75 max-w-2xl">
-            Pick a preset that matches your platform, language and vibe. We&apos;ll
-            copy its settings directly into your creator profile
-            (vibe, tone, niche, audience…) so ideas and captions feel on-brand
-            from day one.
+            {t("usecases_subtitle")}
           </p>
         </header>
 
         {/* Brand Persona Generator */}
         <section className="mb-10 rounded-3xl bg-white/60 backdrop-blur border border-purple/10 shadow-sm px-5 py-6 md:px-6 md:py-7">
           <h2 className="text-sm md:text-base font-semibold text-dark mb-1 flex items-center gap-2">
-            🎭 Define your creator brand (AI-powered)
+            {t("usecases_brand_title")}
           </h2>
           <p className="text-xs md:text-sm text-dark/70 mb-4 max-w-2xl">
-            Not sure about your vibe, tone or niche? Fill this in and Postly will
-            suggest brand personas with recommended style, bio and content pillars.
+            {t("usecases_brand_subtitle")}
           </p>
 
           {/* form inputs */}
           <div className="grid md:grid-cols-2 gap-3 text-xs md:text-sm mb-4">
             <input
               className="rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2"
-              placeholder="Your niche (fitness, modeling, gamer, OF, beauty...)"
+              placeholder={t("usecases_brand_niche_placeholder")}
               value={brandForm.niche}
               onChange={(e) =>
                 setBrandForm((p) => ({ ...p, niche: e.target.value }))
@@ -259,7 +254,7 @@ export default function UseCasesPage() {
             />
             <input
               className="rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2"
-              placeholder="Who do you want to attract?"
+              placeholder={t("usecases_brand_target_placeholder")}
               value={brandForm.target_audience}
               onChange={(e) =>
                 setBrandForm((p) => ({
@@ -270,7 +265,7 @@ export default function UseCasesPage() {
             />
             <textarea
               className="rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2 md:col-span-2"
-              placeholder="Your goals (grow fast, build fans, increase OF income...)"
+              placeholder={t("usecases_brand_goals_placeholder")}
               rows={2}
               value={brandForm.goals}
               onChange={(e) =>
@@ -279,7 +274,7 @@ export default function UseCasesPage() {
             />
             <input
               className="rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2 md:col-span-2"
-              placeholder="Comfort level (playful, serious, explicit, introverted...)"
+              placeholder={t("usecases_brand_comfort_placeholder")}
               value={brandForm.comfort_level}
               onChange={(e) =>
                 setBrandForm((p) => ({
@@ -299,14 +294,16 @@ export default function UseCasesPage() {
             disabled={brandLoading}
             className="rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 text-white text-xs md:text-sm font-semibold shadow-md shadow-purple/30 disabled:opacity-60"
           >
-            {brandLoading ? "Thinking…" : "Generate brand personas"}
+            {brandLoading
+              ? t("usecases_brand_button_thinking")
+              : t("usecases_brand_button_generate")}
           </button>
 
           {/* results */}
           {brandPersonas.length > 0 && (
             <div className="mt-5 space-y-4">
               <h3 className="text-xs md:text-sm font-semibold text-dark">
-                Pick the persona that resonates most with your creator identity:
+                {t("usecases_brand_pick_persona")}
               </h3>
 
               {brandPersonas.map((p, idx) => {
@@ -332,7 +329,9 @@ export default function UseCasesPage() {
                         onClick={() => applyPersonaToProfile(idx)}
                         className="rounded-2xl bg-purple/10 px-3 py-1 text-[0.7rem] font-semibold text-purple hover:bg-purple/20"
                       >
-                        {active ? "Applied ✓" : "Use this persona"}
+                        {active
+                          ? t("usecases_brand_button_applied")
+                          : t("usecases_brand_button_use_persona")}
                       </button>
                     </div>
 
@@ -367,7 +366,7 @@ export default function UseCasesPage() {
                               onClick={() => copyBio(p.brand_bio)}
                               className="rounded-xl bg-purple text-white px-3 py-1 text-xs font-semibold hover:bg-purple/90"
                             >
-                              Copy
+                              {t("common_copy")}
                             </button>
                             <button
                               type="button"
@@ -375,9 +374,7 @@ export default function UseCasesPage() {
                               disabled={isThisBioLoading}
                               className="rounded-2xl bg-white border border-purple/30 px-2 py-1 text-[0.7rem] font-semibold text-purple hover:bg-purple/5 disabled:opacity-60"
                             >
-                              {isThisBioLoading
-                                ? "Refining…"
-                                : "Refine bio"}
+                              {t("usecases_bio_refine_button")}
                             </button>
                           </div>
                         </div>
@@ -389,7 +386,7 @@ export default function UseCasesPage() {
                               <div className="rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2">
                                 <div className="flex items-center justify-between mb-1">
                                   <span className="font-semibold text-dark">
-                                    Short bio
+                                    {t("usecases_bio_short_label")}
                                   </span>
                                   <button
                                     type="button"
@@ -398,7 +395,7 @@ export default function UseCasesPage() {
                                     }
                                     className="rounded-xl bg-purple text-white px-3 py-1 text-xs font-semibold hover:bg-purple/90"
                                   >
-                                    Copy
+                                    {t("common_copy")}
                                   </button>
                                 </div>
                                 <p className="text-dark/80">
@@ -411,7 +408,7 @@ export default function UseCasesPage() {
                               <div className="rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2">
                                 <div className="flex items-center justify-between mb-1">
                                   <span className="font-semibold text-dark">
-                                    Long bio
+                                    {t("usecases_bio_long_label")}
                                   </span>
                                   <button
                                     type="button"
@@ -420,7 +417,7 @@ export default function UseCasesPage() {
                                     }
                                     className="rounded-xl bg-purple text-white px-3 py-1 text-xs font-semibold hover:bg-purple/90"
                                   >
-                                    Copy
+                                    {t("common_copy")}
                                   </button>
                                 </div>
                                 <p className="text-dark/80">
@@ -433,7 +430,7 @@ export default function UseCasesPage() {
                               <div className="rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2">
                                 <div className="flex items-center justify-between mb-1">
                                   <span className="font-semibold text-dark">
-                                    CTA-optimized
+                                    {t("usecases_bio_cta_label")}
                                   </span>
                                   <button
                                     type="button"
@@ -442,7 +439,7 @@ export default function UseCasesPage() {
                                     }
                                     className="rounded-xl bg-purple text-white px-3 py-1 text-xs font-semibold hover:bg-purple/90"
                                   >
-                                    Copy
+                                    {t("common_copy")}
                                   </button>
                                 </div>
                                 <p className="text-dark/80">
@@ -455,7 +452,7 @@ export default function UseCasesPage() {
                               <div className="rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2">
                                 <div className="flex items-center justify-between mb-1">
                                   <span className="font-semibold text-dark">
-                                    Fun / playful
+                                    {t("usecases_bio_fun_label")}
                                   </span>
                                   <button
                                     type="button"
@@ -464,7 +461,7 @@ export default function UseCasesPage() {
                                     }
                                     className="rounded-xl bg-purple text-white px-3 py-1 text-xs font-semibold hover:bg-purple/90"
                                   >
-                                    Copy
+                                    {t("common_copy")}
                                   </button>
                                 </div>
                                 <p className="text-dark/80">
@@ -488,41 +485,26 @@ export default function UseCasesPage() {
           {/* How to use Postly / use cases */}
           <div className="rounded-3xl bg-white/40 backdrop-blur border border-purple/10 shadow-sm px-5 py-5 md:px-6 md:py-6">
             <h2 className="text-sm md:text-base font-semibold text-dark mb-3">
-              How creators use Postly
+              {t("usecases_how_title")}
             </h2>
             <ul className="text-xs md:text-sm text-dark/75 space-y-2.5">
-              <li>
-                <strong className="text-dark">1. Pick a preset</strong>{" "}
-                that matches your main platform (e.g. OF, IG Reels, TikTok trends…).
-              </li>
-              <li>
-                <strong className="text-dark">2. We copy the settings</strong>{" "}
-                (vibe, tone, niche, target audience, language) into your profile.
-              </li>
-              <li>
-                <strong className="text-dark">3. Generate ideas & captions</strong>{" "}
-                from the Dashboard — they&apos;ll be aligned with the preset.
-              </li>
-              <li>
-                <strong className="text-dark">4. Tweak anytime</strong>{" "}
-                from your Account page if you change style or target.
-              </li>
+              <li>{t("usecases_how_step1")}</li>
+              <li>{t("usecases_how_step2")}</li>
+              <li>{t("usecases_how_step3")}</li>
+              <li>{t("usecases_how_step4")}</li>
             </ul>
           </div>
 
           {/* Presets info */}
           <div className="rounded-3xl bg-white/40 backdrop-blur border border-purple/10 shadow-sm px-5 py-5 md:px-6 md:py-6">
             <h2 className="text-sm md:text-base font-semibold text-dark mb-2">
-              Preset library
+              {t("usecases_presets_title")}
             </h2>
             <p className="text-xs md:text-sm text-dark/75 mb-3">
-              We&apos;re adding curated setups for typical creator profiles:
-              OF, Instagram models, cosplay, fitness, gaming and more.
+              {t("usecases_presets_subtitle")}
             </p>
             <p className="text-xs md:text-[0.8rem] text-dark/60">
-              After applying a preset, go to your{" "}
-              <span className="font-semibold text-purple">Dashboard</span> and
-              start generating — no extra setup needed.
+              {t("usecases_presets_note")}
             </p>
           </div>
         </section>
@@ -531,67 +513,68 @@ export default function UseCasesPage() {
         {loading ? (
           <div className="flex justify-center items-center py-16">
             <div className="h-6 w-6 rounded-full border-2 border-purple/30 border-t-purple animate-spin" />
-            <span className="ml-3 text-sm text-dark/70">Loading presets…</span>
+            <span className="ml-3 text-sm text-dark/70">
+              {t("usecases_loading_presets")}
+            </span>
           </div>
         ) : templates.length === 0 ? (
           <div className="rounded-3xl bg-white/40 backdrop-blur border border-purple/10 shadow-sm px-6 py-10 text-center text-sm text-dark/70">
-            No presets yet. We&apos;re still seeding the library — check back soon!
+            {t("usecases_empty_presets")}
           </div>
         ) : (
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm md:text-base font-semibold text-dark">
-                Available presets
+                {t("usecases_list_title")}
               </h2>
               <p className="text-[0.8rem] text-dark/60">
-                Click <span className="font-semibold">Apply preset</span> to
-                update your creator profile instantly.
+                {t("usecases_list_hint")}
               </p>
             </div>
 
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {templates.map((t) => (
+              {templates.map((tpl) => (
                 <article
-                  key={t.id}
+                  key={tpl.id}
                   className="relative rounded-3xl bg-white/80 backdrop-blur border border-purple/10 shadow-sm hover:shadow-lg hover:border-purple/30 transition-all px-4 py-4 md:px-5 md:py-5"
                 >
                   <h3 className="text-sm md:text-[0.95rem] font-semibold text-dark mb-1">
-                    {t.title}
+                    {tpl.title}
                   </h3>
                   <p className="text-[0.78rem] md:text-xs text-dark/70 mb-3 line-clamp-3">
-                    {t.short_description}
+                    {tpl.short_description}
                   </p>
 
                   <div className="flex flex-wrap gap-1.5 mb-4 text-[0.68rem] md:text-[0.7rem]">
                     <span className="inline-flex items-center rounded-full bg-purple/5 border border-purple/15 px-2 py-0.5 text-purple font-medium">
-                      {t.main_platform}
+                      {tpl.main_platform}
                     </span>
                     <span className="inline-flex items-center rounded-full bg-teal/5 border border-teal/15 px-2 py-0.5 text-teal font-medium">
-                      {t.preferred_language.toUpperCase()}
+                      {tpl.preferred_language.toUpperCase()}
                     </span>
-                    {t.vibe && (
+                    {tpl.vibe && (
                       <span className="inline-flex items-center rounded-full bg-yellow/10 border border-yellow/20 px-2 py-0.5 text-[0.7rem] text-yellow-700">
-                        {t.vibe}
+                        {tpl.vibe}
                       </span>
                     )}
-                    {t.tone && (
+                    {tpl.tone && (
                       <span className="inline-flex items-center rounded-full bg-pink/10 border border-pink/20 px-2 py-0.5 text-[0.7rem] text-pink-700">
-                        {t.tone}
+                        {tpl.tone}
                       </span>
                     )}
-                    {t.niche && (
+                    {tpl.niche && (
                       <span className="inline-flex items-center rounded-full bg-dark/5 border border-dark/10 px-2 py-0.5 text-[0.7rem] text-dark/80">
-                        {t.niche}
+                        {tpl.niche}
                       </span>
                     )}
                   </div>
 
                   <button
                     type="button"
-                    onClick={() => applyTemplate(t.id)}
+                    onClick={() => applyTemplate(tpl.id)}
                     className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-3 py-2 text-xs md:text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
                   >
-                    Apply preset
+                    {t("usecases_apply_button")}
                   </button>
                 </article>
               ))}

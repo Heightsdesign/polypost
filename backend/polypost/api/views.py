@@ -1147,6 +1147,7 @@ class IdeaActionPlanView(views.APIView):
         )
 
         return Response(plan, status=status.HTTP_200_OK)
+    
 class BioVariantsView(views.APIView):
     """
     POST /api/brand/bio-variants/

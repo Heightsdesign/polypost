@@ -3,7 +3,6 @@ import Navbar from "./components/Navbar";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Gallery";
-import Scheduler from "./pages/Scheduler";
 import Account from "./pages/Account";
 import Gallery from "./pages/Gallery";
 import RegisterPage from "./pages/register/RegisterPage";
@@ -67,14 +66,6 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Upload />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/scheduler"
-              element={
-                <ProtectedRoute>
-                  <Scheduler />
                 </ProtectedRoute>
               }
             />

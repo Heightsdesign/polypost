@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../api";
 import ReviewsSection from "../components/ReviewSection";
+import { useLanguage } from "../i18n/LanguageContext";
 
 // blobs & bg
 import BlobRed from "../assets/blobs/blob-1.png";
@@ -16,7 +17,6 @@ import BlobGreen from "../assets/blobs/blob-4.png";
 import BlobPurpleDot from "../assets/blobs/blob-6.png";
 import BlobRedLarge from "../assets/blobs/blob-5.png";
 import SchedulerWidget, { type Reminder } from "../components/SchedulerWidget";
-
 
 // simple modal
 function Modal({
@@ -62,7 +62,6 @@ function Modal({
   );
 }
 
-
 type UsageSummary = {
   ideas_used: number;
   ideas_limit: number;
@@ -71,6 +70,8 @@ type UsageSummary = {
 };
 
 export default function Dashboard() {
+  const { t } = useLanguage();
+
   // modals
   const [openIdeas, setOpenIdeas] = useState(false);
   const [openUpload, setOpenUpload] = useState(false);
@@ -79,7 +80,7 @@ export default function Dashboard() {
   const [ideas, setIdeas] = useState<any[]>([]);
   const [ideasLoading, setIdeasLoading] = useState(false);
 
-    // idea action plans
+  // idea action plans
   const [ideaPlans, setIdeaPlans] = useState<Record<number, any>>({});
   const [planLoadingIdx, setPlanLoadingIdx] = useState<number | null>(null);
 
@@ -94,14 +95,12 @@ export default function Dashboard() {
 
   // scheduler
   const [reminders, setReminders] = useState<Reminder[]>([]);
-
   const [mediaDraftTitle, setMediaDraftTitle] = useState("");
 
   // drafts
   const [recentDrafts, setRecentDrafts] = useState<any[]>([]);
 
   const [usage, setUsage] = useState<UsageSummary | null>(null);
-
 
   async function refreshRecentDrafts() {
     try {
@@ -127,7 +126,7 @@ export default function Dashboard() {
     fetchUsageSummary();
   }, []);
 
-  // load scheduler when modal opens
+  // load scheduler when page mounts
   useEffect(() => {
     (async () => {
       try {
@@ -138,7 +137,6 @@ export default function Dashboard() {
       }
     })();
   }, []);
-
 
   // ----- handlers -----
   async function handleGenerateIdeas() {
@@ -155,7 +153,7 @@ export default function Dashboard() {
       }
       setIdeas(data || []);
 
-      // NEW: refresh usage so the count updates on the dashboard
+      // refresh usage so the count updates on the dashboard
       fetchUsageSummary();
     } catch (e) {
       console.warn(e);
@@ -170,25 +168,25 @@ export default function Dashboard() {
     const formData = new FormData();
     formData.append("file", file);
     try {
-      setUploadStatus("Uploading...");
+      setUploadStatus(t("dashboard_upload_status_uploading"));
       const res = await api.post("/uploads/", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       const mediaId = res.data.id || res.data.media_id || res.data.uuid;
       setUploadId(mediaId);
-      setUploadStatus("Uploaded ✅ — you can generate a caption now.");
+      setUploadStatus(t("dashboard_upload_status_uploaded"));
     } catch (err) {
-      setUploadStatus("Upload failed.");
+      setUploadStatus(t("dashboard_upload_status_failed"));
     }
   }
 
   async function handleGenerateCaption() {
     if (!uploadId) {
-      setUploadStatus("Upload first.");
+      setUploadStatus(t("dashboard_upload_status_need_upload"));
       return;
     }
     try {
-      setUploadStatus("Generating caption...");
+      setUploadStatus(t("dashboard_upload_status_caption_generating"));
       const res = await api.post("/captions/generate/", {
         media_id: uploadId,
       });
@@ -198,9 +196,9 @@ export default function Dashboard() {
         (payload && (payload.caption || payload.text)) ||
         JSON.stringify(payload);
       setCaption(captionText);
-      setUploadStatus("Caption generated ✅");
+      setUploadStatus(t("dashboard_upload_status_caption_ready"));
     } catch (err) {
-      setUploadStatus("Caption generation failed.");
+      setUploadStatus(t("dashboard_upload_status_caption_failed"));
     }
   }
 
@@ -241,11 +239,10 @@ export default function Dashboard() {
         idea: {
           title: idea.title || "",
           description: idea.description || "",
-          platform: "instagram", // or use user's default platform if you have it
+          platform: "instagram",
         },
       });
 
-      // backend might call it "plan" or "action_plan" or "text"
       const text =
         res.data.plan ||
         res.data.action_plan ||
@@ -263,34 +260,31 @@ export default function Dashboard() {
     }
   }
 
-
-
-
   async function handleSaveMediaDraft() {
     if (!uploadId || !captionObj) {
-      setUploadStatus("Generate a caption first.");
+      setUploadStatus(t("dashboard_upload_status_need_caption"));
       return;
     }
 
     if (!mediaDraftTitle.trim()) {
-      setUploadStatus("Please add a title before saving this draft.");
+      setUploadStatus(t("dashboard_upload_status_need_title"));
       return;
     }
 
     try {
       setSavingMediaDraft(true);
       await api.post("/drafts/", {
-        draft_type: "media",            // 👈 important
+        draft_type: "media",
         media: uploadId,
         caption: captionObj.id,
-        title: mediaDraftTitle.trim(),  // 👈 THIS is what must go through
+        title: mediaDraftTitle.trim(),
       });
       await refreshRecentDrafts();
-      setUploadStatus("Media draft saved ✅");
+      setUploadStatus(t("dashboard_upload_status_saved"));
       setMediaDraftTitle("");
     } catch (e) {
       console.warn(e);
-      setUploadStatus("Failed to save draft.");
+      setUploadStatus(t("dashboard_upload_status_save_failed"));
     } finally {
       setSavingMediaDraft(false);
     }
@@ -312,7 +306,7 @@ export default function Dashboard() {
         }}
       />
 
-      {/* blobs */}
+      {/* blobs (unchanged) */}
       <img
         src={BlobGreen}
         alt=""
@@ -369,11 +363,10 @@ export default function Dashboard() {
         <header className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-semibold text-dark mb-1">
-              Dashboard
+              {t("dashboard_header_title")}
             </h1>
             <p className="text-sm md:text-base text-dark/70 max-w-xl">
-              Generate content ideas, captions and schedule posts – all in one
-              place.
+              {t("dashboard_header_subtitle")}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -381,13 +374,13 @@ export default function Dashboard() {
               to="/use-cases"
               className="rounded-2xl border border-purple/20 bg-white/70 px-4 py-2 text-xs md:text-sm font-semibold text-purple shadow-sm hover:bg-purple/5 transition-all"
             >
-              Use cases & templates
+              {t("dashboard_header_button_use_cases")}
             </Link>
             <Link
               to="/gallery"
               className="rounded-2xl bg-purple text-xs md:text-sm font-semibold text-white px-4 py-2 shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
             >
-              Open gallery
+              {t("dashboard_header_button_gallery")}
             </Link>
           </div>
         </header>
@@ -401,11 +394,10 @@ export default function Dashboard() {
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5">
                 <div>
                   <h2 className="text-sm md:text-base font-semibold text-dark mb-1">
-                    Create something new
+                    {t("dashboard_quick_title")}
                   </h2>
                   <p className="text-xs md:text-sm text-dark/70">
-                    Generate ideas, captions or upload media to start drafting
-                    your next post.
+                    {t("dashboard_quick_subtitle")}
                   </p>
                 </div>
               </div>
@@ -417,11 +409,11 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xl">💡</span>
                       <h2 className="text-sm md:text-base font-semibold text-dark">
-                        Idea generator
+                        {t("dashboard_card_ideas_title")}
                       </h2>
                     </div>
                     <p className="text-xs md:text-sm text-dark/70">
-                      Get hooks, angles and ideas tailored to your niche.
+                      {t("dashboard_card_ideas_text")}
                     </p>
                   </div>
                   <button
@@ -429,7 +421,7 @@ export default function Dashboard() {
                     className="mt-4 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
                     type="button"
                   >
-                    Open ideas
+                    {t("dashboard_card_ideas_button")}
                   </button>
                 </div>
 
@@ -439,11 +431,11 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xl">🖼️</span>
                       <h2 className="text-sm md:text-base font-semibold text-dark">
-                        Upload & Caption
+                        {t("dashboard_card_upload_title")}
                       </h2>
                     </div>
                     <p className="text-xs md:text-sm text-dark/70">
-                      Upload an image or video and get a caption instantly.
+                      {t("dashboard_card_upload_text")}
                     </p>
                   </div>
                   <button
@@ -451,7 +443,7 @@ export default function Dashboard() {
                     className="mt-4 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
                     type="button"
                   >
-                    Open upload
+                    {t("dashboard_card_upload_button")}
                   </button>
                 </div>
 
@@ -461,11 +453,11 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xl">📅</span>
                       <h2 className="text-sm md:text-base font-semibold text-dark">
-                        Smart scheduler
+                        {t("dashboard_card_scheduler_title")}
                       </h2>
                     </div>
                     <p className="text-xs md:text-sm text-dark/70">
-                      See best times to post and plan your content calendar.
+                      {t("dashboard_card_scheduler_text")}
                     </p>
                   </div>
                   <button
@@ -476,11 +468,12 @@ export default function Dashboard() {
                     className="mt-4 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
                     type="button"
                   >
-                    Open scheduler
+                    {t("dashboard_card_scheduler_button")}
                   </button>
                 </div>
               </div>
             </section>
+
             <SchedulerWidget
               reminders={reminders}
               setReminders={setReminders}
@@ -500,14 +493,14 @@ export default function Dashboard() {
             <section className="rounded-3xl bg-white/90 backdrop-blur-xl border border-white/40 shadow-md p-5 md:p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm md:text-base font-semibold text-dark">
-                  Quick snapshot
+                  {t("dashboard_stats_title")}
                 </h2>
               </div>
 
               <div className="grid grid-cols-3 gap-3 text-xs md:text-sm">
                 <div className="rounded-2xl bg-purple/5 border border-purple/10 px-3 py-3">
                   <p className="text-[0.7rem] uppercase tracking-wide text-dark/60 mb-1">
-                    Ideas generated
+                    {t("dashboard_stats_ideas_label")}
                   </p>
                   <p className="text-lg font-semibold text-purple">
                     {usage ? `${usage.ideas_used} / ${usage.ideas_limit || 0}` : "—"}
@@ -515,7 +508,7 @@ export default function Dashboard() {
                 </div>
                 <div className="rounded-2xl bg-pink/5 border border-pink/10 px-3 py-3">
                   <p className="text-[0.7rem] uppercase tracking-wide text-dark/60 mb-1">
-                    Drafts saved
+                    {t("dashboard_stats_drafts_label")}
                   </p>
                   <p className="text-lg font-semibold text-pink">
                     {recentDrafts.length}
@@ -523,7 +516,7 @@ export default function Dashboard() {
                 </div>
                 <div className="rounded-2xl bg-yellow-100/40 border border-yellow-200 px-3 py-3">
                   <p className="text-[0.7rem] uppercase tracking-wide text-dark/60 mb-1">
-                    Scheduled posts
+                    {t("dashboard_stats_scheduled_label")}
                   </p>
                   <p className="text-lg font-semibold text-amber-600">
                     {reminders.length}
@@ -536,20 +529,20 @@ export default function Dashboard() {
             <section className="mb-8">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm md:text-base font-semibold text-dark">
-                  Recent drafts
+                  {t("dashboard_recent_title")}
                 </h2>
                 <Link
                   to="/gallery"
                   className="text-xs md:text-sm text-purple hover:text-pink transition-colors"
                 >
-                  View all drafts →
+                  {t("dashboard_recent_link_all")}
                 </Link>
               </div>
 
               <div className="rounded-3xl bg-white/95 backdrop-blur-xl border border-white/20 shadow-md px-4 py-4 md:px-6 md:py-5">
                 {recentDrafts.length === 0 ? (
                   <p className="text-xs md:text-sm text-dark/95">
-                    No drafts yet. Generate ideas or upload to start.
+                    {t("dashboard_recent_empty")}
                   </p>
                 ) : (
                   <ul className="space-y-2 text-xs md:text-sm text-dark/80">
@@ -557,7 +550,7 @@ export default function Dashboard() {
                       <li key={d.id} className="flex items-center justify-between">
                         <div>
                           <span className="font-medium">
-                            {d.title || "Untitled"}
+                            {d.title || t("dashboard_recent_untitled")}
                           </span>
                           {d.status && (
                             <span className="ml-1 text-dark/60">
@@ -566,15 +559,15 @@ export default function Dashboard() {
                           )}
                           <p className="text-[0.7rem] text-dark/60">
                             {d.draft_type === "media"
-                              ? "Media draft"
-                              : "Idea draft"}
+                              ? t("dashboard_recent_type_media")
+                              : t("dashboard_recent_type_idea")}
                           </p>
                         </div>
                         <Link
                           to="/gallery"
                           className="rounded-full bg-purple/10 px-3 py-1 text-[0.7rem] font-semibold text-purple hover:bg-purple/20 transition-colors"
                         >
-                          Open
+                          {t("dashboard_recent_open_button")}
                         </Link>
                       </li>
                     ))}
@@ -591,11 +584,10 @@ export default function Dashboard() {
         <Modal
           open={openIdeas}
           onClose={() => setOpenIdeas(false)}
-          title="Idea generator"
+          title={t("dashboard_modal_ideas_title")}
         >
           <p className="text-xs md:text-sm text-dark/70 mb-3">
-            We’ll generate hooks and ideas for Instagram. Later you’ll be able to
-            tweak your niche & platform.
+            {t("dashboard_modal_ideas_intro")}
           </p>
           <button
             onClick={handleGenerateIdeas}
@@ -603,13 +595,15 @@ export default function Dashboard() {
             className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 disabled:opacity-60 hover:translate-y-[-1px] active:translate-y-0 transition-all"
             type="button"
           >
-            {ideasLoading ? "Generating..." : "Generate 5 ideas"}
+            {ideasLoading
+              ? t("dashboard_modal_ideas_button_generating")
+              : t("dashboard_modal_ideas_button_generate")}
           </button>
 
           <div className="mt-4 space-y-3">
             {ideas.length === 0 && !ideasLoading && (
               <p className="text-xs md:text-sm text-dark/70">
-                No ideas yet. Click the button above.
+                {t("dashboard_modal_ideas_empty")}
               </p>
             )}
             {ideas.map((idea, idx) => (
@@ -620,7 +614,7 @@ export default function Dashboard() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-1">
                     <h3 className="font-semibold text-dark">
-                      {idea.title || "Idea"}
+                      {idea.title || t("dashboard_modal_ideas_fallback_title")}
                     </h3>
 
                     {idea.description && (
@@ -629,14 +623,18 @@ export default function Dashboard() {
 
                     {idea.suggested_caption_starter && (
                       <p className="text-[0.75rem] text-dark/70">
-                        <span className="font-semibold">Caption start:</span>{" "}
+                        <span className="font-semibold">
+                          {t("dashboard_modal_ideas_caption_start_label")}
+                        </span>{" "}
                         {idea.suggested_caption_starter}
                       </p>
                     )}
 
                     {idea.personal_twist && (
                       <p className="text-[0.75rem] text-dark/70">
-                        <span className="font-semibold">Twist:</span>{" "}
+                        <span className="font-semibold">
+                          {t("dashboard_modal_ideas_twist_label")}
+                        </span>{" "}
                         {idea.personal_twist}
                       </p>
                     )}
@@ -648,7 +646,9 @@ export default function Dashboard() {
                     disabled={savingIdeaId === idx}
                     className="ml-2 shrink-0 rounded-2xl bg-purple/10 px-3 py-1 text-[0.7rem] font-semibold text-purple hover:bg-purple/20 disabled:opacity-60 transition-all"
                   >
-                    {savingIdeaId === idx ? "Saving..." : "Save draft"}
+                    {savingIdeaId === idx
+                      ? t("dashboard_modal_ideas_save_saving")
+                      : t("dashboard_modal_ideas_save_button")}
                   </button>
                 </div>
 
@@ -660,179 +660,181 @@ export default function Dashboard() {
                     disabled={planLoadingIdx === idx}
                     className="inline-flex items-center justify-center rounded-2xl bg-purple/10 px-3 py-1.5 text-[0.7rem] font-semibold text-purple hover:bg-purple/20 disabled:opacity-60 transition-all"
                   >
-                    {planLoadingIdx === idx ? "Generating plan…" : "Generate action plan"}
+                    {planLoadingIdx === idx
+                      ? t("dashboard_modal_ideas_plan_generating")
+                      : t("dashboard_modal_ideas_plan_button")}
                   </button>
 
                   {ideaPlans[idx] && (
                     <span className="text-[0.7rem] text-green-700">
-                      ✓ Action plan ready
+                      {t("dashboard_modal_ideas_plan_ready")}
                     </span>
                   )}
                 </div>
 
-                {/* Loading / error */}
+                {/* Loading copy */}
                 {planLoadingIdx === idx && (
                   <p className="mt-1 text-[0.7rem] text-dark/60">
-                    We’re breaking this idea into concrete steps…
+                    {t("dashboard_modal_ideas_plan_loading")}
                   </p>
                 )}
 
-
                 {/* Simple action plan inline */}
-                {ideaPlans[idx] && (() => {
-                  const raw = ideaPlans[idx];
+                {ideaPlans[idx] &&
+                  (() => {
+                    const raw = ideaPlans[idx];
 
-                  // Helper to turn a plan object into readable text
-                  const toText = (plan: any): string => {
-                    if (!plan) return "";
+                    const toText = (plan: any): string => {
+                      if (!plan) return "";
+                      if (typeof plan === "string") return plan;
 
-                    // If it's already a string, just return it
-                    if (typeof plan === "string") return plan;
-
-                    // If backend wrapped the real plan inside these fields
-                    if (plan.plan || plan.action_plan || plan.text) {
-                      const inner = plan.plan || plan.action_plan || plan.text;
-                      if (typeof inner === "string") return inner;
-                      plan = inner;
-                    }
-
-                    const parts: string[] = [];
-
-                    // ✅ Specific handling for your current shape
-                    if (plan.idea_title) {
-                      parts.push(plan.idea_title);
-                    }
-
-                    if (plan.concept_summary) {
-                      parts.push(plan.concept_summary);
-                    }
-
-                    if (Array.isArray(plan.sections) && plan.sections.length > 0) {
-                      const sectionLines: string[] = [];
-
-                      plan.sections.forEach((sec: any, sIdx: number) => {
-                        if (!sec) return;
-                        const title = sec.title || `Part ${sIdx + 1}`;
-                        sectionLines.push(`${title}:`);
-
-                        if (Array.isArray(sec.steps) && sec.steps.length > 0) {
-                          sec.steps.forEach((step: any, i: number) => {
-                            const text = typeof step === "string" ? step : step.text || step.description || "";
-                            if (text) {
-                              sectionLines.push(`  ${i + 1}. ${text}`);
-                            }
-                          });
-                        }
-
-                        sectionLines.push(""); // blank line between sections
-                      });
-
-                      parts.push(sectionLines.join("\n"));
-                    }
-
-                    // Generic fallback fields (works for other shapes too)
-                    if (plan.overview) {
-                      parts.push(plan.overview);
-                    }
-
-                    if (Array.isArray(plan.steps) && plan.steps.length > 0) {
-                      parts.push(
-                        "Steps:\n" +
-                          plan.steps
-                            .map((s: any, i: number) => {
-                              if (typeof s === "string") return `${i + 1}. ${s}`;
-                              const title = s.title || `Step ${i + 1}`;
-                              const detail = s.detail || s.description || "";
-                              return `${i + 1}. ${title}${detail ? ` – ${detail}` : ""}`;
-                            })
-                            .join("\n")
-                      );
-                    }
-
-                    if (Array.isArray(plan.checklist) && plan.checklist.length > 0) {
-                      parts.push(
-                        "Checklist:\n" +
-                          plan.checklist
-                            .map((c: any) => {
-                              const text = typeof c === "string" ? c : c.text || "";
-                              return text ? `• ${text}` : "";
-                            })
-                            .filter(Boolean)
-                            .join("\n")
-                      );
-                    }
-
-                    if (plan.hook) {
-                      parts.push(`Hook: ${plan.hook}`);
-                    }
-
-                    if (plan.caption_template || plan.caption_prompt) {
-                      parts.push(
-                        `Caption starter: ${plan.caption_template || plan.caption_prompt}`
-                      );
-                    }
-
-                    if (Array.isArray(plan.tags) && plan.tags.length > 0) {
-                      parts.push("Tags: " + plan.tags.join(", "));
-                    }
-
-                    if (plan.timeframe) {
-                      parts.push(`Timeframe: ${plan.timeframe}`);
-                    }
-
-                    // If we still have nothing, last resort: JSON
-                    if (!parts.length) {
-                      try {
-                        return JSON.stringify(plan, null, 2);
-                      } catch {
-                        return "";
+                      if (plan.plan || plan.action_plan || plan.text) {
+                        const inner = plan.plan || plan.action_plan || plan.text;
+                        if (typeof inner === "string") return inner;
+                        plan = inner;
                       }
+
+                      const parts: string[] = [];
+
+                      if (plan.idea_title) {
+                        parts.push(plan.idea_title);
+                      }
+
+                      if (plan.concept_summary) {
+                        parts.push(plan.concept_summary);
+                      }
+
+                      if (Array.isArray(plan.sections) && plan.sections.length > 0) {
+                        const sectionLines: string[] = [];
+
+                        plan.sections.forEach((sec: any, sIdx: number) => {
+                          if (!sec) return;
+                          const title = sec.title || `Part ${sIdx + 1}`;
+                          sectionLines.push(`${title}:`);
+
+                          if (Array.isArray(sec.steps) && sec.steps.length > 0) {
+                            sec.steps.forEach((step: any, i: number) => {
+                              const text =
+                                typeof step === "string"
+                                  ? step
+                                  : step.text || step.description || "";
+                              if (text) {
+                                sectionLines.push(`  ${i + 1}. ${text}`);
+                              }
+                            });
+                          }
+
+                          sectionLines.push("");
+                        });
+
+                        parts.push(sectionLines.join("\n"));
+                      }
+
+                      if (plan.overview) {
+                        parts.push(plan.overview);
+                      }
+
+                      if (Array.isArray(plan.steps) && plan.steps.length > 0) {
+                        parts.push(
+                          "Steps:\n" +
+                            plan.steps
+                              .map((s: any, i: number) => {
+                                if (typeof s === "string") return `${i + 1}. ${s}`;
+                                const title = s.title || `Step ${i + 1}`;
+                                const detail = s.detail || s.description || "";
+                                return `${i + 1}. ${title}${
+                                  detail ? ` – ${detail}` : ""
+                                }`;
+                              })
+                              .join("\n")
+                        );
+                      }
+
+                      if (
+                        Array.isArray(plan.checklist) &&
+                        plan.checklist.length > 0
+                      ) {
+                        parts.push(
+                          "Checklist:\n" +
+                            plan.checklist
+                              .map((c: any) => {
+                                const text =
+                                  typeof c === "string" ? c : c.text || "";
+                                return text ? `• ${text}` : "";
+                              })
+                              .filter(Boolean)
+                              .join("\n")
+                        );
+                      }
+
+                      if (plan.hook) {
+                        parts.push(`Hook: ${plan.hook}`);
+                      }
+
+                      if (plan.caption_template || plan.caption_prompt) {
+                        parts.push(
+                          `Caption starter: ${
+                            plan.caption_template || plan.caption_prompt
+                          }`
+                        );
+                      }
+
+                      if (Array.isArray(plan.tags) && plan.tags.length > 0) {
+                        parts.push("Tags: " + plan.tags.join(", "));
+                      }
+
+                      if (plan.timeframe) {
+                        parts.push(`Timeframe: ${plan.timeframe}`);
+                      }
+
+                      if (!parts.length) {
+                        try {
+                          return JSON.stringify(plan, null, 2);
+                        } catch {
+                          return "";
+                        }
+                      }
+
+                      return parts.join("\n\n");
+                    };
+
+                    let text = "";
+
+                    if (typeof raw === "string") {
+                      try {
+                        const parsed = JSON.parse(raw);
+                        text = toText(parsed) || raw;
+                      } catch {
+                        text = raw;
+                      }
+                    } else {
+                      text = toText(raw);
                     }
 
-                    return parts.join("\n\n");
-                  };
+                    if (!text) return null;
 
+                    return (
+                      <div className="mt-4 text-[0.85rem] text-dark/85 whitespace-pre-line leading-relaxed">
+                        <span className="block text-[0.9rem] font-semibold mb-2 text-purple-700">
+                          {t("dashboard_actionplan_title")}
+                        </span>
 
-                  let text = "";
-
-                  if (typeof raw === "string") {
-                    // Try to parse JSON, otherwise just use the string
-                    try {
-                      const parsed = JSON.parse(raw);
-                      text = toText(parsed) || raw;
-                    } catch {
-                      text = raw;
-                    }
-                  } else {
-                    text = toText(raw);
-                  }
-
-                  if (!text) return null;
-
-                  return (
-                   <div className="mt-4 text-[0.85rem] text-dark/85 whitespace-pre-line leading-relaxed">
-                    <span className="block text-[0.9rem] font-semibold mb-2 text-purple-700">
-                      Action plan
-                    </span>
-
-                    <div
-                      className="space-y-3"
-                      dangerouslySetInnerHTML={{
-                        __html: text
-                          .replace(/^([A-Za-z ].+?):$/gm, "<strong>$1:</strong>") // bold section subtitles
-                          .replace(/\n/g, "<br>") // keep line breaks
-                      }}
-                    />
-                  </div>
-
-                  );
-                })()}
-
-                
-
+                        <div
+                          className="space-y-3"
+                          dangerouslySetInnerHTML={{
+                            __html: text
+                              .replace(
+                                /^([A-Za-z ].+?):$/gm,
+                                "<strong>$1:</strong>"
+                              )
+                              .replace(/\n/g, "<br>"),
+                          }}
+                        />
+                      </div>
+                    );
+                  })()}
               </div>
             ))}
-
           </div>
         </Modal>
 
@@ -840,7 +842,7 @@ export default function Dashboard() {
         <Modal
           open={openUpload}
           onClose={() => setOpenUpload(false)}
-          title="Upload & Caption"
+          title={t("dashboard_modal_upload_title")}
         >
           <form
             onSubmit={handleUpload}
@@ -855,12 +857,14 @@ export default function Dashboard() {
               type="submit"
               className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
             >
-              Upload
+              {t("dashboard_modal_upload_button")}
             </button>
           </form>
 
           {uploadStatus && (
-            <p className="mt-2 text-xs md:text-sm text-dark/75">{uploadStatus}</p>
+            <p className="mt-2 text-xs md:text-sm text-dark/75">
+              {uploadStatus}
+            </p>
           )}
 
           {uploadId && (
@@ -870,7 +874,7 @@ export default function Dashboard() {
                 className="inline-flex items-center justify-center rounded-2xl bg-purple/10 px-4 py-2 text-xs md:text-sm font-semibold text-purple hover:bg-purple/20 transition-all"
                 type="button"
               >
-                Generate caption
+                {t("dashboard_upload_caption_button")}
               </button>
             </div>
           )}
@@ -878,7 +882,9 @@ export default function Dashboard() {
           {caption && (
             <div className="mt-3 space-y-2">
               <div>
-                <h3 className="text-sm font-semibold mb-1 text-dark">Caption</h3>
+                <h3 className="text-sm font-semibold mb-1 text-dark">
+                  {t("dashboard_upload_caption_label")}
+                </h3>
                 <textarea
                   value={caption}
                   readOnly
@@ -889,14 +895,14 @@ export default function Dashboard() {
 
               <div>
                 <label className="block text-[0.75rem] font-semibold text-dark mb-1">
-                  Draft title
+                  {t("dashboard_upload_draft_title_label")}
                 </label>
                 <input
                   type="text"
                   value={mediaDraftTitle}
                   onChange={(e) => setMediaDraftTitle(e.target.value)}
                   className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2 text-xs md:text-sm text-dark/80"
-                  placeholder="e.g. Gym selfie before/after, Beach reel, Q&A story"
+                  placeholder={t("dashboard_upload_draft_title_placeholder")}
                 />
               </div>
 
@@ -906,7 +912,9 @@ export default function Dashboard() {
                 disabled={savingMediaDraft}
                 className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-purple to-pink px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-md shadow-purple/30 hover:shadow-purple/40 disabled:opacity-60 hover:translate-y-[-1px] active:translate-y-0 transition-all"
               >
-                {savingMediaDraft ? "Saving..." : "Save as draft"}
+                {savingMediaDraft
+                  ? t("dashboard_upload_save_saving")
+                  : t("dashboard_upload_save_button")}
               </button>
             </div>
           )}

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api";
+import { useLanguage } from "../i18n/LanguageContext";
 
 type DraftType = "idea" | "media";
 
@@ -19,7 +20,6 @@ type Draft = {
   media?: string | null;
   caption?: string | null;
   media_url?: string | null;
-  // Optional extras if you later expose them from the backend
   caption_text?: string | null;
   execution_plan?: string | null;
 };
@@ -32,6 +32,8 @@ type CaptionPayload = {
 };
 
 export default function Gallery() {
+  const { t } = useLanguage();
+
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<"all" | "pinned" | "idea" | "media">(
@@ -97,7 +99,7 @@ export default function Gallery() {
     } else {
       // media draft
       setEditTitle(d.title || "");
-      setModalCaption(d.caption_text || ""); // if you later add caption_text to serializer
+      setModalCaption(d.caption_text || "");
       setCaptionObj(null);
       setEditDescription("");
       setEditHook("");
@@ -113,7 +115,7 @@ export default function Gallery() {
     setModalCaption("");
   }
 
-    // Turn execution_plan JSON into readable text
+  // Turn execution_plan JSON into readable text
   function renderExecutionPlan(raw?: string | null) {
     if (!raw) return null;
 
@@ -130,14 +132,8 @@ export default function Gallery() {
 
       const parts: string[] = [];
 
-      // Specific shape you showed
-      if (plan.idea_title) {
-        parts.push(plan.idea_title);
-      }
-
-      if (plan.concept_summary) {
-        parts.push(plan.concept_summary);
-      }
+      if (plan.idea_title) parts.push(plan.idea_title);
+      if (plan.concept_summary) parts.push(plan.concept_summary);
 
       if (Array.isArray(plan.sections) && plan.sections.length > 0) {
         const sectionLines: string[] = [];
@@ -159,16 +155,13 @@ export default function Gallery() {
             });
           }
 
-          sectionLines.push(""); // blank line between sections
+          sectionLines.push("");
         });
 
         parts.push(sectionLines.join("\n"));
       }
 
-      // Generic fallbacks
-      if (plan.overview) {
-        parts.push(plan.overview);
-      }
+      if (plan.overview) parts.push(plan.overview);
 
       if (Array.isArray(plan.steps) && plan.steps.length > 0) {
         parts.push(
@@ -178,9 +171,7 @@ export default function Gallery() {
                 if (typeof s === "string") return `${i + 1}. ${s}`;
                 const title = s.title || `Step ${i + 1}`;
                 const detail = s.detail || s.description || "";
-                return `${i + 1}. ${title}${
-                  detail ? ` – ${detail}` : ""
-                }`;
+                return `${i + 1}. ${title}${detail ? ` – ${detail}` : ""}`;
               })
               .join("\n")
         );
@@ -240,13 +231,12 @@ export default function Gallery() {
     return (
       <div className="mt-4 text-[0.85rem] text-dark/85 whitespace-pre-line leading-relaxed">
         <span className="block text-[0.9rem] font-semibold mb-2 text-purple-700">
-          Action plan
+          {t("gallery_action_plan_title")}
         </span>
         <div
           className="space-y-3"
           dangerouslySetInnerHTML={{
             __html: text
-              // bold section subtitles like "Preparation:"
               .replace(
                 /^([A-Za-z ].+?):$/gm,
                 "<strong>$1:</strong>"
@@ -257,7 +247,6 @@ export default function Gallery() {
       </div>
     );
   }
-
 
   // ---------- actions: pin / unpin / archive ----------
 
@@ -284,7 +273,7 @@ export default function Gallery() {
   }
 
   async function archiveDraft(draft: Draft) {
-    if (!window.confirm("Archive this draft? It will disappear from this view.")) {
+    if (!window.confirm(t("gallery_archive_confirm"))) {
       return;
     }
     setActionLoadingId(draft.id);
@@ -301,13 +290,12 @@ export default function Gallery() {
     }
   }
 
-  // ---------- actions: save idea changes (requires a PATCH endpoint) ----------
+  // ---------- actions: save idea changes ----------
 
   async function handleSaveIdeaChanges() {
     if (!selectedDraft) return;
     setSavingIdeaChanges(true);
     try {
-      // optimistic update
       const updated: Draft = {
         ...selectedDraft,
         title: editTitle,
@@ -319,8 +307,6 @@ export default function Gallery() {
       setSelectedDraft(updated);
       setDrafts((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
 
-      // If you add a PATCH/PUT view for /drafts/<id>/ on the backend,
-      // this call will persist the changes:
       await api.patch(`/drafts/${selectedDraft.id}/`, {
         title: editTitle,
         description: editDescription,
@@ -357,9 +343,6 @@ export default function Gallery() {
     }
   }
 
-  // If later you want to persist the *new* caption to the draft, you could:
-  // await api.patch(`/drafts/${selectedDraft.id}/`, { caption: captionObj.id });
-
   // ---------- UI ----------
 
   return (
@@ -369,11 +352,10 @@ export default function Gallery() {
         <header className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-semibold text-dark mb-1">
-              My content gallery
+              {t("gallery_title")}
             </h1>
             <p className="text-sm md:text-base text-dark/70 max-w-xl">
-              All your saved ideas and media drafts created in Postly. Pin your
-              favorites, archive what&apos;s done.
+              {t("gallery_subtitle")}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -381,7 +363,7 @@ export default function Gallery() {
               to="/dashboard"
               className="rounded-2xl border border-purple/20 bg-white/70 px-4 py-2 text-xs md:text-sm font-semibold text-purple shadow-sm hover:bg-purple/5 transition-all"
             >
-              ← Back to dashboard
+              {t("gallery_back_to_dashboard")}
             </Link>
           </div>
         </header>
@@ -397,7 +379,7 @@ export default function Gallery() {
             } transition-all`}
             onClick={() => setFilter("all")}
           >
-            All drafts
+            {t("gallery_filter_all")}
           </button>
           <button
             type="button"
@@ -408,7 +390,7 @@ export default function Gallery() {
             } transition-all`}
             onClick={() => setFilter("pinned")}
           >
-            Pinned
+            {t("gallery_filter_pinned")}
           </button>
           <button
             type="button"
@@ -419,7 +401,7 @@ export default function Gallery() {
             } transition-all`}
             onClick={() => setFilter("idea")}
           >
-            Ideas
+            {t("gallery_filter_idea")}
           </button>
           <button
             type="button"
@@ -430,23 +412,25 @@ export default function Gallery() {
             } transition-all`}
             onClick={() => setFilter("media")}
           >
-            Media drafts
+            {t("gallery_filter_media")}
           </button>
         </div>
 
         {/* Loading / empty */}
         {loading && (
-          <p className="text-sm text-dark/70 mb-2">Loading drafts...</p>
+          <p className="text-sm text-dark/70 mb-2">
+            {t("gallery_loading")}
+          </p>
         )}
 
         {!loading && drafts.length === 0 && (
           <div className="rounded-3xl bg-white/90 border border-white/40 shadow-md px-4 py-6 md:px-6 md:py-8">
             <p className="text-sm md:text-base text-dark/80">
-              No drafts yet. Go to the{" "}
+              {t("gallery_empty_text")}{" "}
               <Link to="/dashboard" className="text-purple underline">
-                dashboard
-              </Link>{" "}
-              to generate ideas or upload media.
+                {t("gallery_empty_link_label")}
+              </Link>
+              .
             </p>
           </div>
         )}
@@ -468,7 +452,7 @@ export default function Gallery() {
                       className="h-40 w-full object-cover"
                     />
                     <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[0.7rem] text-white">
-                      Media draft
+                      {t("gallery_badge_media")}
                     </span>
                   </div>
                 )}
@@ -478,17 +462,19 @@ export default function Gallery() {
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="text-sm md:text-base font-semibold text-dark">
-                          {d.title || "Untitled draft"}
+                          {d.title || t("gallery_card_untitled")}
                         </h3>
                         {d.pinned && (
                           <span className="text-[0.7rem] rounded-full bg-amber-100 text-amber-700 px-2 py-0.5">
-                            Pinned
+                            {t("gallery_badge_pinned")}
                           </span>
                         )}
                       </div>
 
                       <p className="text-[0.7rem] uppercase tracking-wide text-dark/50 mb-1">
-                        {d.draft_type === "media" ? "Media draft" : "Idea draft"}
+                        {d.draft_type === "media"
+                          ? t("gallery_badge_media")
+                          : t("gallery_badge_idea")}
                       </p>
                     </div>
                     <button
@@ -497,7 +483,9 @@ export default function Gallery() {
                       disabled={actionLoadingId === d.id}
                       className="text-[0.7rem] rounded-full bg-purple/5 px-2 py-1 text-purple hover:bg-purple/15 disabled:opacity-60"
                     >
-                      {d.pinned ? "Unpin" : "Pin"}
+                      {d.pinned
+                        ? t("gallery_button_unpin")
+                        : t("gallery_button_pin")}
                     </button>
                   </div>
 
@@ -507,21 +495,21 @@ export default function Gallery() {
                       {d.description ||
                         d.suggested_caption_starter ||
                         d.personal_twist ||
-                        "Idea details"}
+                        t("gallery_card_idea_fallback")}
                     </p>
                   )}
                   {d.draft_type === "media" && (
                     <p className="text-xs md:text-sm text-dark/75 line-clamp-3">
                       {d.caption_text
                         ? d.caption_text
-                        : "Media draft with caption. Open to view / regenerate."}
+                        : t("gallery_card_media_fallback")}
                     </p>
                   )}
 
                   {/* Date */}
                   {d.created_at && (
                     <p className="text-[0.7rem] text-dark/50 mt-1">
-                      Saved{" "}
+                      {t("gallery_card_saved_prefix")}{" "}
                       {new Date(d.created_at).toLocaleString(undefined, {
                         dateStyle: "medium",
                         timeStyle: "short",
@@ -536,7 +524,7 @@ export default function Gallery() {
                       onClick={() => openDetail(d)}
                       className="text-[0.75rem] rounded-2xl bg-purple text-white px-3 py-1.5 font-semibold hover:bg-purple/90"
                     >
-                      View details
+                      {t("gallery_button_view_details")}
                     </button>
                     <button
                       type="button"
@@ -544,7 +532,7 @@ export default function Gallery() {
                       disabled={actionLoadingId === d.id}
                       className="text-[0.7rem] rounded-2xl bg-red-50 text-red-600 px-3 py-1.5 hover:bg-red-100 disabled:opacity-60"
                     >
-                      Archive
+                      {t("gallery_button_archive")}
                     </button>
                   </div>
                 </div>
@@ -560,12 +548,13 @@ export default function Gallery() {
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div>
                   <h2 className="text-lg font-semibold text-dark">
-                    {selectedDraft.title || "Draft details"}
+                    {selectedDraft.title ||
+                      t("gallery_modal_title_fallback")}
                   </h2>
                   <p className="text-xs md:text-sm text-dark/60">
                     {selectedDraft.draft_type === "media"
-                      ? "Media draft – view image and regenerate caption."
-                      : "Idea draft – tweak the content and save it."}
+                      ? t("gallery_modal_subtitle_media")
+                      : t("gallery_modal_subtitle_idea")}
                   </p>
                 </div>
                 <button
@@ -583,17 +572,17 @@ export default function Gallery() {
                 <div className="flex flex-wrap items-center gap-2 text-[0.75rem]">
                   {selectedDraft.pinned && (
                     <span className="rounded-full bg-amber-100 text-amber-700 px-2 py-0.5">
-                      Pinned
+                      {t("gallery_badge_pinned")}
                     </span>
                   )}
                   <span className="rounded-full bg-purple/5 text-purple px-2 py-0.5">
                     {selectedDraft.draft_type === "media"
-                      ? "Media draft"
-                      : "Idea draft"}
+                      ? t("gallery_badge_media")
+                      : t("gallery_badge_idea")}
                   </span>
                   {selectedDraft.created_at && (
                     <span className="text-dark/60">
-                      Saved{" "}
+                      {t("gallery_card_saved_prefix")}{" "}
                       {new Date(selectedDraft.created_at).toLocaleString(
                         undefined,
                         { dateStyle: "medium", timeStyle: "short" }
@@ -616,7 +605,7 @@ export default function Gallery() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <h3 className="text-sm font-semibold text-dark">
-                          Caption
+                          {t("gallery_modal_caption_label")}
                         </h3>
                         <button
                           type="button"
@@ -625,8 +614,8 @@ export default function Gallery() {
                           className="text-[0.75rem] rounded-full bg-purple/10 px-3 py-1 font-semibold text-purple hover:bg-purple/20 disabled:opacity-60"
                         >
                           {regeneratingCaption
-                            ? "Regenerating..."
-                            : "Regenerate"}
+                            ? t("gallery_modal_caption_regenerating")
+                            : t("gallery_modal_caption_regenerate")}
                         </button>
                       </div>
                       <textarea
@@ -634,16 +623,16 @@ export default function Gallery() {
                         onChange={(e) => setModalCaption(e.target.value)}
                         rows={4}
                         className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2 text-xs md:text-sm text-dark/80"
-                        placeholder="Caption will appear here after generating."
+                        placeholder={t("gallery_modal_caption_placeholder")}
                       />
                       {captionObj && (
                         <p className="text-[0.7rem] text-dark/60">
-                          New caption generated at{" "}
+                          {t("gallery_modal_caption_generated_prefix")}{" "}
                           {captionObj.created_at &&
                             new Date(
                               captionObj.created_at
                             ).toLocaleString()}{" "}
-                          (not yet linked to this draft on the backend).
+                          {t("gallery_modal_caption_generated_suffix")}
                         </p>
                       )}
                     </div>
@@ -655,46 +644,54 @@ export default function Gallery() {
                   <div className="space-y-3">
                     <div>
                       <label className="block text-[0.75rem] font-semibold text-dark mb-1">
-                        Title
+                        {t("gallery_idea_title_label")}
                       </label>
                       <input
                         type="text"
                         value={editTitle}
                         onChange={(e) => setEditTitle(e.target.value)}
                         className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2 text-xs md:text-sm text-dark/80"
-                        placeholder="Idea title"
+                        placeholder={t(
+                          "gallery_idea_title_placeholder"
+                        )}
                       />
                     </div>
 
                     <div>
                       <label className="block text-[0.75rem] font-semibold text-dark mb-1">
-                        Description
+                        {t("gallery_idea_description_label")}
                       </label>
                       <textarea
                         value={editDescription}
-                        onChange={(e) => setEditDescription(e.target.value)}
+                        onChange={(e) =>
+                          setEditDescription(e.target.value)
+                        }
                         rows={3}
                         className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2 text-xs md:text-sm text-dark/80"
-                        placeholder="Describe the content idea"
+                        placeholder={t(
+                          "gallery_idea_description_placeholder"
+                        )}
                       />
                     </div>
 
                     <div className="grid gap-3 md:grid-cols-2">
                       <div>
                         <label className="block text-[0.75rem] font-semibold text-dark mb-1">
-                          Hook used
+                          {t("gallery_idea_hook_label")}
                         </label>
                         <input
                           type="text"
                           value={editHook}
                           onChange={(e) => setEditHook(e.target.value)}
                           className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2 text-xs md:text-sm text-dark/80"
-                          placeholder="Hook or angle used"
+                          placeholder={t(
+                            "gallery_idea_hook_placeholder"
+                          )}
                         />
                       </div>
                       <div>
                         <label className="block text-[0.75rem] font-semibold text-dark mb-1">
-                          Caption starter
+                          {t("gallery_idea_caption_starter_label")}
                         </label>
                         <input
                           type="text"
@@ -703,23 +700,28 @@ export default function Gallery() {
                             setEditCaptionStarter(e.target.value)
                           }
                           className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2 text-xs md:text-sm text-dark/80"
-                          placeholder="Suggested opening line"
+                          placeholder={t(
+                            "gallery_idea_caption_starter_placeholder"
+                          )}
                         />
                       </div>
                     </div>
 
                     <div>
                       <label className="block text-[0.75rem] font-semibold text-dark mb-1">
-                        Personal twist
+                        {t("gallery_idea_twist_label")}
                       </label>
                       <textarea
                         value={editTwist}
                         onChange={(e) => setEditTwist(e.target.value)}
                         rows={2}
                         className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2 text-xs md:text-sm text-dark/80"
-                        placeholder="How you want to personalize this idea"
+                        placeholder={t(
+                          "gallery_idea_twist_placeholder"
+                        )}
                       />
                     </div>
+
                     {renderExecutionPlan(selectedDraft.execution_plan)}
                   </div>
                 )}
@@ -733,7 +735,9 @@ export default function Gallery() {
                       disabled={actionLoadingId === selectedDraft.id}
                       className="rounded-2xl bg-purple/10 px-3 py-1.5 text-[0.75rem] font-semibold text-purple hover:bg-purple/20 disabled:opacity-60"
                     >
-                      {selectedDraft.pinned ? "Unpin" : "Pin"}
+                      {selectedDraft.pinned
+                        ? t("gallery_button_unpin")
+                        : t("gallery_button_pin")}
                     </button>
                     <button
                       type="button"
@@ -741,7 +745,7 @@ export default function Gallery() {
                       disabled={actionLoadingId === selectedDraft.id}
                       className="rounded-2xl bg-red-50 px-3 py-1.5 text-[0.75rem] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-60"
                     >
-                      Archive
+                      {t("gallery_button_archive")}
                     </button>
                   </div>
 
@@ -752,7 +756,9 @@ export default function Gallery() {
                       disabled={savingIdeaChanges}
                       className="rounded-2xl bg-purple px-4 py-1.5 text-[0.75rem] font-semibold text-white hover:bg-purple/90 disabled:opacity-60"
                     >
-                      {savingIdeaChanges ? "Saving..." : "Save changes"}
+                      {savingIdeaChanges
+                        ? t("gallery_idea_save_saving")
+                        : t("gallery_idea_save_button")}
                     </button>
                   )}
                 </div>

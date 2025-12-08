@@ -1,6 +1,7 @@
 // src/components/SchedulerWidget.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import api from "../api";
+import { useLanguage } from "../i18n/LanguageContext";
 
 export type Reminder = {
   id: string;
@@ -21,7 +22,7 @@ interface SchedulerWidgetProps {
   reminders: Reminder[];
   setReminders: React.Dispatch<React.SetStateAction<Reminder[]>>;
   drafts: DraftSummary[];
-  loadReminders: () => Promise<void>;
+  loadReminders: () => Promise<void>; // (still in props, even if not used yet)
 }
 
 function toDateString(date: Date) {
@@ -57,6 +58,8 @@ const SchedulerWidget: React.FC<SchedulerWidgetProps> = ({
   setReminders,
   drafts,
 }) => {
+  const { t } = useLanguage();
+
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -79,7 +82,7 @@ const SchedulerWidget: React.FC<SchedulerWidgetProps> = ({
   const [formNotifyEmail, setFormNotifyEmail] = useState(true);
   const [savingReminder, setSavingReminder] = useState(false);
 
-  // posting suggestions (legacy generator – still available via modal)
+  // posting suggestions (legacy generator)
   const [suggestPlatform, setSuggestPlatform] = useState("instagram");
   const [suggestions, setSuggestions] = useState<
     { datetime: string; platform: string; reason?: string }[]
@@ -115,16 +118,14 @@ const SchedulerWidget: React.FC<SchedulerWidgetProps> = ({
       setReminders((prev) => prev.filter((r) => r.id !== id));
     } catch (err) {
       console.error("Error deleting reminder", err);
-      alert("Could not delete reminder. Please try again.");
+      alert(t("scheduler_alert_delete_failed"));
     }
   }
-
 
   const remindersByDay = useMemo(() => {
     const map: Record<string, Reminder[]> = {};
     for (const r of reminders) {
       const d = parseISOWithoutTZ(r.scheduled_at);
-
       const key = toDateString(d);
       if (!map[key]) map[key] = [];
       map[key].push(r);
@@ -177,7 +178,7 @@ const SchedulerWidget: React.FC<SchedulerWidgetProps> = ({
       setShowReminderModal(false);
     } catch (err) {
       console.error("Error saving reminder", err);
-      alert("Could not save reminder. Please try again.");
+      alert(t("scheduler_alert_save_failed"));
     } finally {
       setSavingReminder(false);
     }
@@ -194,7 +195,7 @@ const SchedulerWidget: React.FC<SchedulerWidgetProps> = ({
       setSuggestions(res.data?.suggestions || []);
     } catch (err) {
       console.error("Error loading suggestions", err);
-      alert("Could not load posting suggestions.");
+      alert(t("scheduler_alert_suggestions_failed"));
     } finally {
       setLoadingSuggestions(false);
     }
@@ -217,36 +218,30 @@ const SchedulerWidget: React.FC<SchedulerWidgetProps> = ({
     setAiToast(null);
 
     try {
-      // Tell backend: generate a plan across all platforms the user set in their profile
       const res = await api.post("/scheduler/ai-plan/", {
         platform: "all",
         days: 7,
       });
 
-      // Refresh reminders so new AI-generated posts appear immediately
-      if (typeof loadReminders === "function") {
-        await loadReminders();
-      }
+      await loadReminders();
 
-      // We expect backend to return a list of platforms used
       const used = res.data?.platforms || [];
 
-      setAiToast(
-        used.length
-          ? `🎯 New posting plan added for: ${used.join(", ")}`
-          : "🎯 New posting plan added to your calendar!"
-      );
+      if (used.length) {
+        setAiToast(t("scheduler_ai_toast_prefix") + used.join(", "));
+      } else {
+        setAiToast(t("scheduler_ai_toast_generic"));
+      }
 
       setTimeout(() => setAiToast(null), 3500);
     } catch (err) {
       console.error(err);
-      setAiToast("⚠️ Could not generate a posting plan.");
+      setAiToast(t("scheduler_ai_toast_error"));
       setTimeout(() => setAiToast(null), 3500);
     } finally {
       setAiLoading(false);
     }
   }
-
 
   const monthLabel = currentMonth.toLocaleString(undefined, {
     month: "long",
@@ -280,10 +275,10 @@ const SchedulerWidget: React.FC<SchedulerWidgetProps> = ({
       <div className="flex items-center justify-between mb-3">
         <div>
           <h2 className="text-sm md:text-base font-semibold text-dark">
-            Scheduler
+            {t("scheduler_title")}
           </h2>
           <p className="text-[11px] text-dark/60">
-            Click a day to add a reminder, or generate a posting plan.
+            {t("scheduler_subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-1">
@@ -360,187 +355,195 @@ const SchedulerWidget: React.FC<SchedulerWidgetProps> = ({
           className="rounded-2xl bg-gradient-to-r from-purple to-pink text-white text-xs font-semibold px-3 py-1.5 shadow-md shadow-purple/30 hover:shadow-purple/40 disabled:opacity-60"
         >
           {aiLoading
-            ? "Generating cross-platform plan…"
-            : "Generate cross-platform posting plan"}
+            ? t("scheduler_ai_button_generating")
+            : t("scheduler_ai_button_generate")}
         </button>
       </div>
 
-
-      {/* Optional: small toast under widget */}
       {aiToast && (
         <p className="mt-2 text-[11px] text-dark/70">{aiToast}</p>
       )}
 
       {/* Reminder modal */}
-      {showReminderModal && selectedDate && (() => {
-        const key = toDateString(selectedDate);
-        const rForDay = remindersByDay[key] || [];
+      {showReminderModal &&
+        selectedDate &&
+        (() => {
+          const key = toDateString(selectedDate);
+          const rForDay = remindersByDay[key] || [];
 
-        return (
-          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
-            <div className="w-full max-w-md rounded-3xl bg-white p-5 shadow-xl border border-purple/10">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-base font-semibold text-dark">
-                  Reminders for{" "}
-                  {selectedDate.toLocaleDateString(undefined, {
-                    weekday: "short",
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setShowReminderModal(false)}
-                  className="h-8 w-8 flex items-center justify-center rounded-full bg-purple/5 text-dark/70 hover:bg-purple/10"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Existing reminders list */}
-              {rForDay.length > 0 && (
-                <div className="mb-4 border border-purple/10 rounded-2xl p-3">
-                  <h3 className="text-xs font-semibold text-dark/70 mb-2">
-                    Existing reminders
-                  </h3>
-                  <ul className="space-y-2 text-xs">
-                    {rForDay.map((r) => {
-                      const dt = new Date(r.scheduled_at);
-                      const timeLabel = dt.toLocaleTimeString(undefined, {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      });
-                      return (
-                        <li
-                          key={r.id}
-                          className="flex items-start justify-between gap-2 rounded-xl border border-purple/15 px-3 py-2"
-                        >
-                          <div>
-                            <div className="font-semibold text-dark">
-                              {timeLabel} · {r.platform}
-                            </div>
-                            {r.note && (
-                              <div className="text-[11px] text-dark/70">
-                                {r.note}
-                              </div>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteReminder(r.id)}
-                            className="text-[11px] text-white-600 hover:text-red-700"
-                          >
-                            Delete
-                          </button>
-                        </li>
-                      );
+          return (
+            <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+              <div className="w-full max-w-md rounded-3xl bg-white p-5 shadow-xl border border-purple/10">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-base font-semibold text-dark">
+                    {t("scheduler_modal_title")}{" "}
+                    {" – "}
+                    {selectedDate.toLocaleDateString(undefined, {
+                      weekday: "short",
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
                     })}
-                  </ul>
-                </div>
-              )}
-
-              {/* New reminder form */}
-              <form onSubmit={handleSaveReminder} className="space-y-3 text-sm">
-                <div>
-                  <label className="block text-xs font-semibold text-dark/70 mb-1">
-                    Time
-                  </label>
-                  <input
-                    type="time"
-                    value={formTime}
-                    onChange={(e) => setFormTime(e.target.value)}
-                    className="w-full border border-purple/20 rounded-xl px-3 py-2 text-sm"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-dark/70 mb-1">
-                    Platform
-                  </label>
-                  <select
-                    value={formPlatform}
-                    onChange={(e) => setFormPlatform(e.target.value)}
-                    className="w-full border border-purple/20 rounded-xl px-3 py-2 text-sm"
-                  >
-                    <option value="instagram">Instagram</option>
-                    <option value="tiktok">TikTok</option>
-                    <option value="twitter">Twitter / X</option>
-                    <option value="onlyfans">OnlyFans</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-dark/70 mb-1">
-                    Attach a draft (optional)
-                  </label>
-                  <select
-                    value={formDraftId}
-                    onChange={(e) => setFormDraftId(e.target.value)}
-                    className="w-full border border-purple/20 rounded-xl px-3 py-2 text-sm"
-                  >
-                    <option value="">No draft</option>
-                    {drafts.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.title || (d.draft_type === "media" ? "Media draft" : "Idea draft")}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-dark/70 mb-1">
-                    Note (optional)
-                  </label>
-                  <textarea
-                    value={formNote}
-                    onChange={(e) => setFormNote(e.target.value)}
-                    rows={3}
-                    className="w-full border border-purple/20 rounded-xl px-3 py-2 text-sm"
-                    placeholder="e.g. Post Reel teaser here"
-                  />
-                </div>
-
-                <label className="flex items-center gap-2 text-xs text-dark/75">
-                  <input
-                    type="checkbox"
-                    checked={formNotifyEmail}
-                    onChange={(e) => setFormNotifyEmail(e.target.checked)}
-                    className="h-4 w-4 rounded border-purple/40"
-                  />
-                  <span>Send me an email reminder.</span>
-                </label>
-
-                <div className="mt-3 flex gap-2">
+                  </h2>
                   <button
                     type="button"
                     onClick={() => setShowReminderModal(false)}
-                    className="flex-1 rounded-2xl border border-purple/20 bg-white px-3 py-2 text-sm font-semibold text-purple"
+                    className="h-8 w-8 flex items-center justify-center rounded-full bg-purple/5 text-dark/70 hover:bg-purple/10"
                   >
-                    Close
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={savingReminder}
-                    className="flex-1 rounded-2xl bg-gradient-to-r from-purple to-pink text-white px-3 py-2 text-sm font-semibold shadow-md shadow-purple/30 disabled:opacity-60"
-                  >
-                    {savingReminder ? "Saving…" : "Add reminder"}
+                    ✕
                   </button>
                 </div>
-              </form>
-            </div>
-          </div>
-        );
-      })()}
 
-      {/* Suggestions modal (legacy generator - still there if you later add a button to open it) */}
+                {/* Existing reminders list */}
+                {rForDay.length > 0 && (
+                  <div className="mb-4 border border-purple/10 rounded-2xl p-3">
+                    <h3 className="text-xs font-semibold text-dark/70 mb-2">
+                      {t("scheduler_modal_existing_label")}
+                    </h3>
+                    <ul className="space-y-2 text-xs">
+                      {rForDay.map((r) => {
+                        const dt = new Date(r.scheduled_at);
+                        const timeLabel = dt.toLocaleTimeString(undefined, {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        });
+                        return (
+                          <li
+                            key={r.id}
+                            className="flex items-start justify-between gap-2 rounded-xl border border-purple/15 px-3 py-2"
+                          >
+                            <div>
+                              <div className="font-semibold text-dark">
+                                {timeLabel} · {r.platform}
+                              </div>
+                              {r.note && (
+                                <div className="text-[11px] text-dark/70">
+                                  {r.note}
+                                </div>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteReminder(r.id)}
+                              className="text-[11px] text-white-600 hover:text-red-700"
+                            >
+                              {t("scheduler_modal_delete_button")}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+
+                {/* New reminder form */}
+                <form onSubmit={handleSaveReminder} className="space-y-3 text-sm">
+                  <div>
+                    <label className="block text-xs font-semibold text-dark/70 mb-1">
+                      {t("scheduler_modal_time_label")}
+                    </label>
+                    <input
+                      type="time"
+                      value={formTime}
+                      onChange={(e) => setFormTime(e.target.value)}
+                      className="w-full border border-purple/20 rounded-xl px-3 py-2 text-sm"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-dark/70 mb-1">
+                      {t("scheduler_modal_platform_label")}
+                    </label>
+                    <select
+                      value={formPlatform}
+                      onChange={(e) => setFormPlatform(e.target.value)}
+                      className="w-full border border-purple/20 rounded-xl px-3 py-2 text-sm"
+                    >
+                      <option value="instagram">Instagram</option>
+                      <option value="tiktok">TikTok</option>
+                      <option value="twitter">Twitter / X</option>
+                      <option value="onlyfans">OnlyFans</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-dark/70 mb-1">
+                      {t("scheduler_modal_attach_label")}
+                    </label>
+                    <select
+                      value={formDraftId}
+                      onChange={(e) => setFormDraftId(e.target.value)}
+                      className="w-full border border-purple/20 rounded-xl px-3 py-2 text-sm"
+                    >
+                      <option value="">
+                        {t("scheduler_modal_no_draft_option")}
+                      </option>
+                      {drafts.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.title ||
+                            (d.draft_type === "media"
+                              ? t("dashboard_recent_type_media")
+                              : t("dashboard_recent_type_idea"))}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-dark/70 mb-1">
+                      {t("scheduler_modal_note_label")}
+                    </label>
+                    <textarea
+                      value={formNote}
+                      onChange={(e) => setFormNote(e.target.value)}
+                      rows={3}
+                      className="w-full border border-purple/20 rounded-xl px-3 py-2 text-sm"
+                      placeholder={t("scheduler_modal_note_placeholder")}
+                    />
+                  </div>
+
+                  <label className="flex items-center gap-2 text-xs text-dark/75">
+                    <input
+                      type="checkbox"
+                      checked={formNotifyEmail}
+                      onChange={(e) => setFormNotifyEmail(e.target.checked)}
+                      className="h-4 w-4 rounded border-purple/40"
+                    />
+                    <span>{t("scheduler_modal_notify_label")}</span>
+                  </label>
+
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowReminderModal(false)}
+                      className="flex-1 rounded-2xl border border-purple/20 bg-white px-3 py-2 text-sm font-semibold text-purple"
+                    >
+                      {t("scheduler_modal_close_button")}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={savingReminder}
+                      className="flex-1 rounded-2xl bg-gradient-to-r from-purple to-pink text-white px-3 py-2 text-sm font-semibold shadow-md shadow-purple/30 disabled:opacity-60"
+                    >
+                      {savingReminder
+                        ? t("scheduler_modal_save_saving")
+                        : t("scheduler_modal_save_button")}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          );
+        })()}
+
+      {/* Suggestions modal (legacy) */}
       {showSuggestionsModal && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-md rounded-3xl bg-white p-5 shadow-xl border border-purple/10">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold text-dark">
-                Recommended posting times
+                {t("scheduler_suggestions_title")}
               </h2>
               <button
                 type="button"
@@ -557,7 +560,7 @@ const SchedulerWidget: React.FC<SchedulerWidgetProps> = ({
             >
               <div>
                 <label className="block text-xs font-semibold text-dark/70 mb-1">
-                  Platform
+                  {t("scheduler_suggestions_platform_label")}
                 </label>
                 <select
                   value={suggestPlatform}
@@ -575,14 +578,16 @@ const SchedulerWidget: React.FC<SchedulerWidgetProps> = ({
                 disabled={loadingSuggestions}
                 className="w-full rounded-2xl bg-gradient-to-r from-purple to-pink text-white px-3 py-2 text-sm font-semibold shadow-md shadow-purple/30"
               >
-                {loadingSuggestions ? "Generating…" : "Generate times"}
+                {loadingSuggestions
+                  ? t("scheduler_suggestions_button_generating")
+                  : t("scheduler_suggestions_button_generate")}
               </button>
             </form>
 
             {suggestions.length > 0 && (
               <div className="max-h-64 overflow-y-auto text-sm">
                 <p className="text-xs text-dark/60 mb-2">
-                  Click a time to turn it into a reminder:
+                  {t("scheduler_suggestions_click_hint")}
                 </p>
                 <ul className="space-y-2">
                   {suggestions.map((s) => {
@@ -619,7 +624,9 @@ const SchedulerWidget: React.FC<SchedulerWidgetProps> = ({
             )}
 
             {loadingSuggestions && (
-              <p className="text-xs text-dark/60">Loading suggestions…</p>
+              <p className="text-xs text-dark/60">
+                {t("scheduler_suggestions_loading")}
+              </p>
             )}
           </div>
         </div>

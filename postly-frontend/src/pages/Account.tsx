@@ -1,18 +1,22 @@
-import { useState, useEffect } from "react";
+// src/pages/Account.tsx
+import React, { useState, useEffect } from "react";
 import api from "../api";
+import { useLanguage } from "../i18n/LanguageContext";
 
- const ALL_PLATFORMS = [
-    { value: "instagram", label: "Instagram" },
-    { value: "tiktok", label: "TikTok" },
-    { value: "twitter", label: "Twitter / X" },
-    { value: "youtube", label: "YouTube" },
-    { value: "twitch", label: "Twitch" },
-    { value: "onlyfans", label: "OnlyFans" },
-    { value: "mym", label: "MYM Fans" },
-    { value: "snapchat", label: "Snapchat" },
-  ];
+const ALL_PLATFORMS = [
+  { value: "instagram", label: "Instagram" },
+  { value: "tiktok", label: "TikTok" },
+  { value: "twitter", label: "Twitter / X" },
+  { value: "youtube", label: "YouTube" },
+  { value: "twitch", label: "Twitch" },
+  { value: "onlyfans", label: "OnlyFans" },
+  { value: "mym", label: "MYM Fans" },
+  { value: "snapchat", label: "Snapchat" },
+];
 
 export default function Account() {
+  const { t } = useLanguage();
+
   const [loading, setLoading] = useState(false);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [error, setError] = useState("");
@@ -40,7 +44,7 @@ export default function Account() {
   const [newPassword, setNewPassword] = useState("");
   const [pwMsg, setPwMsg] = useState("");
 
-   // identity + avatar
+  // identity + avatar
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -50,15 +54,12 @@ export default function Account() {
 
   const [preferredPlatforms, setPreferredPlatforms] = useState<string[]>([]);
 
- 
-
-
+  // load profile
   useEffect(() => {
     (async () => {
       setLoading(true);
       setError("");
       try {
-        // load creator profile + identity + avatar
         const res = await api.get("/auth/me/profile/");
         const d = res.data;
 
@@ -72,7 +73,6 @@ export default function Account() {
         setTargetAudience(d.target_audience || "");
         setDefaultPlatform(d.default_platform || "instagram");
         setTimezone(d.timezone || "UTC");
-        // NEW: map backend booleans -> toggles
         setNotifyEmail(
           typeof d.notifications_enabled === "boolean"
             ? d.notifications_enabled
@@ -90,15 +90,13 @@ export default function Account() {
             ? [d.default_platform]
             : ["instagram"]
         );
-
       } catch (err) {
-        setError("Could not load preferences.");
+        setError(t("account_error_load_prefs"));
       } finally {
         setLoading(false);
       }
-
     })();
-  }, []);
+  }, [t]);
 
   // load billing
   useEffect(() => {
@@ -135,17 +133,15 @@ export default function Account() {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      // backend returns updated profile, including new avatar URL
       setAvatarUrl(res.data.avatar || null);
       setSuccess(true);
     } catch (err) {
       console.error(err);
-      setError("Could not upload avatar.");
+      setError(t("account_error_avatar"));
     } finally {
       setUploadingAvatar(false);
     }
   }
-
 
   async function handleSavePrefs(e: React.FormEvent) {
     e.preventDefault();
@@ -166,7 +162,7 @@ export default function Account() {
       });
       setSuccess(true);
     } catch (err) {
-      setError("Could not save preferences.");
+      setError(t("account_error_save_prefs"));
     } finally {
       setSavingPrefs(false);
     }
@@ -183,12 +179,11 @@ export default function Account() {
       });
       setSuccess(true);
     } catch (err) {
-      setError("Could not save notification preferences.");
+      setError(t("account_error_save_notifications"));
     } finally {
       setSavingPrefs(false);
     }
   }
-
 
   // start stripe checkout
   async function handleUpgrade() {
@@ -196,19 +191,18 @@ export default function Account() {
     try {
       const res = await api.post("/billing/create-checkout/", {
         plan: "pro",
-        // frontend domain for redirect after success:
         domain: window.location.origin,
       });
-      // backend returns { checkout_url: "https://checkout.stripe.com/..." }
       if (res.data.checkout_url) {
         window.location.href = res.data.checkout_url;
       }
     } catch (err) {
-      alert("Could not start checkout (did you set STRIPE_SECRET_KEY?).");
+      alert(t("account_billing_checkout_error"));
     } finally {
       setCheckoutLoading(false);
     }
   }
+
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
     setPwMsg("");
@@ -217,7 +211,7 @@ export default function Account() {
         old_password: oldPassword,
         new_password: newPassword,
       });
-      setPwMsg("Password updated ✅");
+      setPwMsg(t("account_pw_change_success"));
       setOldPassword("");
       setNewPassword("");
     } catch (err: any) {
@@ -229,11 +223,10 @@ export default function Account() {
         if (data.new_password) msgs.push(...data.new_password);
         setPwMsg(msgs.join(" "));
       } else {
-        setPwMsg("Could not change password. Please try again.");
+        setPwMsg(t("account_pw_change_error_generic"));
       }
     }
   }
-
 
   function handleLogout() {
     localStorage.removeItem("postly_token");
@@ -247,20 +240,20 @@ export default function Account() {
         window.location.href = res.data.auth_url;
       }
     } catch (err) {
-      alert("IG connect not implemented yet.");
+      alert(t("account_connect_ig_error"));
     }
   }
 
   return (
     <div style={{ maxWidth: 700, margin: "0 auto" }}>
-      <h1>Account Settings</h1>
-      <p>Manage your creator profile, plan, and connections.</p>
+      <h1>{t("account_title")}</h1>
+      <p>{t("account_subtitle")}</p>
 
       {/* Profile + avatar */}
       <section style={sectionStyle}>
-        <h2>Profile</h2>
+        <h2>{t("account_profile_title")}</h2>
         <p style={{ color: "#666", marginBottom: "0.75rem" }}>
-          Update your picture and basic info. We use this to personalise your experience.
+          {t("account_profile_subtitle")}
         </p>
 
         <div
@@ -314,7 +307,7 @@ export default function Account() {
                   marginRight: "0.5rem",
                 }}
               >
-                Choose file
+                {t("account_profile_choose_file")}
                 <input
                   type="file"
                   accept="image/*"
@@ -334,33 +327,40 @@ export default function Account() {
               onClick={handleAvatarUpload}
               disabled={!avatarFile || uploadingAvatar}
             >
-              {uploadingAvatar ? "Uploading..." : "Save picture"}
+              {uploadingAvatar
+                ? t("account_profile_uploading")
+                : t("account_profile_save_picture")}
             </button>
           </div>
         </div>
 
         <div style={{ fontSize: "0.85rem", color: "#555" }}>
           <div>
-            <strong>Username:</strong> {username || "—"}
+            <strong>{t("account_profile_username_label")}</strong>{" "}
+            {username || "—"}
           </div>
           <div>
-            <strong>Email:</strong> {email || "—"}
+            <strong>{t("account_profile_email_label")}</strong>{" "}
+            {email || "—"}
           </div>
         </div>
       </section>
 
-
       {/* Billing */}
       <section style={sectionStyle}>
-        <h2>Plan & Billing</h2>
+        <h2>{t("account_billing_title")}</h2>
 
         {billingLoading ? (
-          <p>Loading plan...</p>
+          <p>{t("account_billing_loading")}</p>
         ) : (
           <>
             <p className="text-sm">
-              Current plan:{" "}
-              <strong>{currentPlan === "pro" ? "Pro ($12/mo)" : "Free"}</strong>
+              {t("account_billing_current_plan_label")}{" "}
+              <strong>
+                {currentPlan === "pro"
+                  ? t("account_billing_plan_pro_label")
+                  : t("account_billing_plan_free_label")}
+              </strong>
             </p>
 
             {currentPlan === "free" ? (
@@ -370,20 +370,21 @@ export default function Account() {
                   disabled={checkoutLoading}
                   className="bg-gradient-to-r from-purple to-pink text-white px-4 py-2 rounded-xl shadow-md shadow-purple/25 text-sm font-semibold hover:shadow-purple/40 transition-all"
                 >
-                  {checkoutLoading ? "Redirecting..." : "Upgrade to Pro"}
+                  {checkoutLoading
+                    ? t("account_billing_upgrade_redirecting")
+                    : t("account_billing_upgrade_button")}
                 </button>
 
-                {/* ➜ NEW: Link to pricing page */}
                 <a
                   href="/pricing"
                   className="text-purple text-xs underline hover:text-pink transition-colors"
                 >
-                  View all plans & pricing →
+                  {t("account_billing_view_pricing_link")}
                 </a>
               </div>
             ) : (
               <p style={{ color: "green" }} className="mt-2">
-                You’re on Pro ✅
+                {t("account_billing_on_pro_label")}
               </p>
             )}
           </>
@@ -396,56 +397,68 @@ export default function Account() {
             marginTop: "0.5rem",
           }}
         >
-          Payments are handled securely by Stripe.
+          {t("account_billing_stripe_note")}
         </p>
       </section>
 
       {/* Creator preferences */}
       <section style={sectionStyle}>
-        <h2>Creator Preferences</h2>
-        <p style={{ color: "#666" }}>
-          These guide AI idea and caption generation across the app.
-        </p>
-        {loading && <p>Loading...</p>}
+        <h2>{t("account_prefs_title")}</h2>
+        <p style={{ color: "#666" }}>{t("account_prefs_subtitle")}</p>
+        {loading && <p>{t("account_prefs_loading")}</p>}
         {error && <p style={{ color: "red" }}>{error}</p>}
-        {success && <p style={{ color: "green" }}>Saved ✅</p>}
+        {success && <p style={{ color: "green" }}>{t("account_prefs_saved")}</p>}
 
         {!loading && (
           <form onSubmit={handleSavePrefs}>
             <div style={fieldStyle}>
-              <label>Vibe</label>
-              <input value={vibe} onChange={(e) => setVibe(e.target.value)} placeholder="fun, edgy, classy..." />
-            </div>
-            <div style={fieldStyle}>
-              <label>Tone</label>
-              <input value={tone} onChange={(e) => setTone(e.target.value)} placeholder="casual, professional..." />
-            </div>
-            <div style={fieldStyle}>
-              <label>Niche</label>
-              <input value={niche} onChange={(e) => setNiche(e.target.value)} placeholder="fitness, beauty, gaming..." />
-            </div>
-            <div style={fieldStyle}>
-              <label>Target audience</label>
+              <label>{t("account_prefs_vibe_label")}</label>
               <input
-                value={targetAudience}
-                onChange={(e) => setTargetAudience(e.target.value)}
-                placeholder="young women, OF subs, IG followers..."
+                value={vibe}
+                onChange={(e) => setVibe(e.target.value)}
+                placeholder={t("account_prefs_vibe_placeholder")}
               />
             </div>
             <div style={fieldStyle}>
-              <label>Default platform</label>
-              <select value={defaultPlatform} onChange={(e) => setDefaultPlatform(e.target.value)}>
+              <label>{t("account_prefs_tone_label")}</label>
+              <input
+                value={tone}
+                onChange={(e) => setTone(e.target.value)}
+                placeholder={t("account_prefs_tone_placeholder")}
+              />
+            </div>
+            <div style={fieldStyle}>
+              <label>{t("account_prefs_niche_label")}</label>
+              <input
+                value={niche}
+                onChange={(e) => setNiche(e.target.value)}
+                placeholder={t("account_prefs_niche_placeholder")}
+              />
+            </div>
+            <div style={fieldStyle}>
+              <label>{t("account_prefs_target_label")}</label>
+              <input
+                value={targetAudience}
+                onChange={(e) => setTargetAudience(e.target.value)}
+                placeholder={t("account_prefs_target_placeholder")}
+              />
+            </div>
+            <div style={fieldStyle}>
+              <label>{t("account_prefs_default_platform_label")}</label>
+              <select
+                value={defaultPlatform}
+                onChange={(e) => setDefaultPlatform(e.target.value)}
+              >
                 <option value="instagram">Instagram</option>
                 <option value="tiktok">TikTok</option>
                 <option value="twitter">X / Twitter</option>
                 <option value="snapchat">Snapchat</option>
                 <option value="onlyfans">OnlyFans</option>
                 <option value="mym">MYM Fans</option>
-                
               </select>
             </div>
             <div style={fieldStyle}>
-              <label>Active platforms</label>
+              <label>{t("account_prefs_active_platforms_label")}</label>
               <div className="flex flex-wrap gap-2">
                 {ALL_PLATFORMS.map((p) => {
                   const checked = preferredPlatforms.includes(p.value);
@@ -474,22 +487,28 @@ export default function Account() {
               </div>
             </div>
             <div style={fieldStyle}>
-              <label>Timezone</label>
-              <input value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder="Europe/Paris" />
+              <label>{t("account_prefs_timezone_label")}</label>
+              <input
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                placeholder={t("account_prefs_timezone_placeholder")}
+              />
             </div>
 
             <button type="submit" disabled={savingPrefs}>
-              {savingPrefs ? "Saving..." : "Save preferences"}
+              {savingPrefs
+                ? t("account_prefs_save_saving")
+                : t("account_prefs_save_button")}
             </button>
           </form>
         )}
       </section>
 
-       {/* Notifications */}
+      {/* Notifications */}
       <section style={sectionStyle}>
-        <h2>Notifications</h2>
+        <h2>{t("account_notifications_title")}</h2>
         <p style={{ color: "#666", marginBottom: "0.75rem" }}>
-          Choose what you want to receive from Postly.
+          {t("account_notifications_subtitle")}
         </p>
 
         <div style={{ marginBottom: "0.5rem" }}>
@@ -499,7 +518,7 @@ export default function Account() {
               checked={notifyEmail}
               onChange={(e) => setNotifyEmail(e.target.checked)}
             />{" "}
-            Content reminders (email / future push)
+            {t("account_notifications_content_label")}
           </label>
         </div>
 
@@ -510,7 +529,7 @@ export default function Account() {
               checked={notifyPush}
               onChange={(e) => setNotifyPush(e.target.checked)}
             />{" "}
-            Newsletter & product updates
+            {t("account_notifications_marketing_label")}
           </label>
         </div>
 
@@ -529,29 +548,39 @@ export default function Account() {
             cursor: "pointer",
           }}
         >
-          Save notification preferences
+          {t("account_notifications_save_button")}
         </button>
       </section>
 
       {/* Connected accounts */}
       <section style={sectionStyle}>
-        <h2>Connected accounts</h2>
+        <h2>{t("account_connected_title")}</h2>
         <div style={connectCard}>
           <div>
             <strong>Instagram</strong>
             <p style={{ margin: 0, color: "#666" }}>
-              Coming soon ...
+              {t("account_connected_ig_coming")}
             </p>
           </div>
-          <button onClick={handleConnectInstagram}>Connect</button>
+          <button onClick={handleConnectInstagram}>
+            {t("account_connected_ig_connect_button")}
+          </button>
         </div>
       </section>
 
       {/* Security */}
       <section style={sectionStyle}>
-        <h2 style={{ marginBottom: "0.5rem" }}>Security</h2>
-        <p style={{ color: "#666", fontSize: "0.85rem", marginBottom: "0.75rem" }}>
-          Change your password. You’ll stay logged in on this device.
+        <h2 style={{ marginBottom: "0.5rem" }}>
+          {t("account_security_title")}
+        </h2>
+        <p
+          style={{
+            color: "#666",
+            fontSize: "0.85rem",
+            marginBottom: "0.75rem",
+          }}
+        >
+          {t("account_security_subtitle")}
         </p>
 
         <form onSubmit={handleChangePassword} style={{ maxWidth: 380 }}>
@@ -565,7 +594,7 @@ export default function Account() {
                 marginBottom: "0.25rem",
               }}
             >
-              Current password
+              {t("account_security_current_pw_label")}
             </label>
             <input
               type="password"
@@ -592,7 +621,7 @@ export default function Account() {
                 marginBottom: "0.25rem",
               }}
             >
-              New password
+              {t("account_security_new_pw_label")}
             </label>
             <input
               type="password"
@@ -613,20 +642,29 @@ export default function Account() {
             type="submit"
             className="bg-purple text-white px-4 py-2 rounded-xl shadow-md shadow-purple/25 text-sm font-semibold hover:shadow-purple/40 transition-all"
           >
-            Change password
+            {t("account_security_change_pw_button")}
           </button>
         </form>
 
         {pwMsg && (
-          <p style={{ marginTop: "0.75rem", fontSize: "0.85rem", color: "#444" }}>
+          <p
+            style={{
+              marginTop: "0.75rem",
+              fontSize: "0.85rem",
+              color: "#444",
+            }}
+          >
             {pwMsg}
           </p>
         )}
 
         <hr style={{ margin: "1.5rem 0" }} />
 
-        <button onClick={handleLogout} style={{ background: "#eee", padding: "0.5rem 0.9rem", borderRadius: 8 }}>
-          Logout
+        <button
+          onClick={handleLogout}
+          style={{ background: "#eee", padding: "0.5rem 0.9rem", borderRadius: 8 }}
+        >
+          {t("account_logout_button")}
         </button>
       </section>
     </div>
