@@ -7,9 +7,11 @@ from rest_framework import generics, permissions, viewsets, parsers, permissions
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
+from rest_framework.exceptions import ValidationError
 
 from django.conf import settings
 from django.utils import timezone as dj_timezone
+from django.db import models
 import zoneinfo
 
 
@@ -25,7 +27,7 @@ from .serializers import (
     MediaUploadSerializer, RegisterSerializer, CaptionGenerateSerializer,
     GeneratedCaptionSerializer, PlannedPostSlotSerializer, CreatorProfileSerializer,
     PostPerformanceSerializer, DraftSerializer, UseCaseTemplateSerializer,
-    PostingReminderSerializer, NotificationSerializer
+    PostingReminderSerializer, NotificationSerializer, PlanSerializer
     )
 
 from .utils import (
@@ -50,8 +52,10 @@ from django.contrib.auth.tokens import default_token_generator
 from django.conf import settings
 
 
+
 from openai import OpenAI
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal, ROUND_HALF_UP
 
 from .scheduling_utils import generate_posting_suggestions, generate_ai_posting_plan
 from .email_templates import get_email_text, normalize_lang_code
@@ -60,6 +64,25 @@ from .email_templates import get_email_text, normalize_lang_code
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # or use decouple
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
 
+CURRENCY_MAP = {
+    "USD": {"symbol": "$"},
+    "EUR": {"symbol": "€"},
+    "MXN": {"symbol": "Mex$"},  # Mexican Peso
+    "BRL": {"symbol": "R$"},    # Brazilian Real
+    "CAD": {"symbol": "C$"},    # Canadian Dollar
+    "AUD": {"symbol": "A$"},    # Australian Dollar
+}
+
+# Countries for each currency
+EUR_COUNTRIES = {
+    "FR", "DE", "ES", "IT", "NL", "BE", "PT", "IE", "AT", "FI", "LU",
+    "SI", "SK", "EE", "LV", "LT", "GR", "CY", "MT"
+}
+
+MXN_COUNTRY = {"MX"}
+BRL_COUNTRY = {"BR"}
+CAD_COUNTRY = {"CA"}
+AUD_COUNTRY = {"AU"}
 
 
 def _get_ip_from_request(request) -> str | None:
@@ -128,6 +151,116 @@ def get_request_lang(request, explicit_lang: str | None = None) -> str:
     return resolved
 
 
+def detect_currency_from_request(request) -> str:
+    """
+    Detects an appropriate currency from the user's IP.
+    Priorities:
+    1. Fallback to regional heuristics
+    2. Default to USD
+    """
+    ip = _get_ip_from_request(request)
+    if not ip:
+        return "USD"
+
+    # ---------------------------------------------------------------
+    # 1. Fallback: region-based heuristic (good enough for MVP)
+    # ---------------------------------------------------------------
+
+    # Latin America (default many countries to USD unless MX/BR handled above)
+    # If you want ARS, CLP later you can expand this list.
+    if request.META.get("HTTP_ACCEPT_LANGUAGE"):
+        langs = request.META["HTTP_ACCEPT_LANGUAGE"].lower()
+        if "es" in langs and "mx" in langs:
+            return "MXN"
+        if "pt" in langs:
+            return "BRL"
+
+    # EU probability fallback
+    if request.META.get("HTTP_ACCEPT_LANGUAGE", "").lower().startswith(
+        ("fr", "de", "es", "it", "pt", "nl")
+    ):
+        return "EUR"
+
+    # Canada fallback
+    if "ca" in request.META.get("HTTP_ACCEPT_LANGUAGE", "").lower():
+        return "CAD"
+
+    # Australia fallback
+    if "au" in request.META.get("HTTP_ACCEPT_LANGUAGE", "").lower():
+        return "AUD"
+
+    # ---------------------------------------------------------------
+    # 2. Default
+    # ---------------------------------------------------------------
+    return "USD"
+
+def convert_usd_to(currency: str, usd_amount) -> Decimal:
+    """
+    Convert a USD base price to the user's currency,
+    then apply charm pricing (e.g. 11.99, 29.99, 59, etc.).
+
+    NOTE:
+    - Keep Stripe / Plan.price_usd as the true billing value.
+    - This function is ONLY for display prices in /billing/plans/.
+    """
+    usd = Decimal(str(usd_amount or 0))
+
+    # Free stays free
+    if usd == 0:
+        return Decimal("0.00")
+
+    # VERY rough FX rates (tune later or load from config)
+    rates: dict[str, Decimal] = {
+        "EUR": Decimal("0.92"),
+        "MXN": Decimal("17.0"),
+        "BRL": Decimal("5.0"),
+        "CAD": Decimal("1.35"),
+        "AUD": Decimal("1.55"),
+    }
+
+    # No conversion for USD
+    if currency not in rates:
+        # USD charm pricing → X.99
+        base = usd.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+        charm = base - Decimal("0.01")
+        if charm <= 0:
+            charm = Decimal("0.99")
+        return charm.quantize(Decimal("0.01"))
+
+    converted = usd * rates[currency]
+
+    # -----------------------
+    # CHARM PRICING BY REGION
+    # -----------------------
+
+    # 1) EUR / CAD / AUD → nearest whole, minus 0.01
+    if currency in {"EUR", "CAD", "AUD"}:
+        base = converted.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+        charm = base - Decimal("0.01")
+        if charm <= 0:
+            charm = Decimal("0.99")
+        return charm.quantize(Decimal("0.01"))
+
+    # 2) MXN / BRL → nearest 5, then minus 1 (e.g. 205 → 204, 200 → 199)
+    if currency in {"MXN", "BRL"}:
+        five = (
+            (converted / Decimal("5"))
+            .quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+            * Decimal("5")
+        )
+        charm = five - Decimal("1")
+        if charm <= 0:
+            charm = Decimal("4.99")
+        return charm.quantize(Decimal("0.01"))
+
+    # Fallback: 0.99 style
+    base = converted.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    charm = base - Decimal("0.01")
+    if charm <= 0:
+        charm = Decimal("0.99")
+    return charm.quantize(Decimal("0.01"))
+
+
 class RegisterView(views.APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -186,18 +319,49 @@ class MeProfileView(generics.RetrieveUpdateAPIView):
     def get_object(self):
         return CreatorProfile.objects.get(user=self.request.user)
 
+
+
 class MediaUploadViewSet(viewsets.ModelViewSet):
-    queryset           = MediaUpload.objects.all()
-    serializer_class   = MediaUploadSerializer
+    queryset = MediaUpload.objects.all()
+    serializer_class = MediaUploadSerializer
     permission_classes = [permissions.IsAuthenticated]
-    parser_classes     = [parsers.MultiPartParser, parsers.FormParser]
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser]
 
     def get_queryset(self):
         # user-scoped
         return self.queryset.filter(user=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        user = self.request.user
+        plan = get_user_plan(user)
+        file_obj = self.request.FILES.get("file")
+
+        # 1) per-file size limit
+        if file_obj:
+            max_bytes = (plan.max_media_size_mb or 0) * 1024 * 1024
+            if max_bytes and file_obj.size > max_bytes:
+                raise ValidationError(
+                    {
+                        "detail": (
+                            f"This file is too large for your current plan. "
+                            f"Max allowed size: {plan.max_media_size_mb} MB."
+                        )
+                    }
+                )
+
+        # 2) monthly uploads quota
+        if not check_usage_allowed(user, "media_upload", amount=1):
+            raise ValidationError(
+                {
+                    "detail": (
+                        "You've reached your monthly upload limit "
+                        "for your current plan. Upgrade to upload more media."
+                    )
+                }
+            )
+
+        # Save if everything is OK
+        serializer.save(user=user)
 
 class GenerateCaptionView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -265,7 +429,7 @@ class GenerateIdeasView(views.APIView):
         # ---------------------------------------------------------------------
         # 1. Plan usage check
         # ---------------------------------------------------------------------
-        if not check_usage_allowed(user, "idea"):
+        if not check_usage_allowed(user, "idea", amount=IDEAS_PER_CALL):
             return Response(
                 {"detail": "Idea limit reached for your plan. Upgrade to Pro."},
                 status=403,
@@ -604,7 +768,21 @@ class DraftListCreateView(generics.ListCreateAPIView):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        user = self.request.user
+
+        # 🚦 plan-based draft limit
+        if not check_usage_allowed(user, "draft", amount=1):
+            raise ValidationError(
+                {
+                    "detail": (
+                        "You've reached the maximum number of drafts allowed on your plan. "
+                        "Archive or delete some drafts, or upgrade to keep more."
+                    )
+                }
+            )
+
+        serializer.save(user=user)
+
 
 
 class DraftPinView(APIView):
@@ -717,39 +895,45 @@ class ApplyUseCaseTemplateView(views.APIView):
     },
     status=status.HTTP_200_OK,
 )
-
+# api/views.py
 class StripeCheckoutSessionView(views.APIView):
     """
     POST /api/billing/create-checkout-session/
-    Body: { "plan_id": <Plan.id> }
+    Body: { "plan_slug": "<slug>" }   # preferred
+    (or legacy: { "plan_id": <id> })
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         user = request.user
-        plan_id = request.data.get("plan_id")
 
-        if not plan_id:
+        plan_slug = request.data.get("plan_slug")
+        plan_id = request.data.get("plan_id")  # optional fallback
+
+        if not plan_slug and not plan_id:
             return Response(
-                {"detail": "You must provide plan_id."},
+                {"detail": "You must provide plan_slug (or plan_id)."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Prefer slug (stable across environments)
         try:
-            plan = Plan.objects.get(id=plan_id)
+            if plan_slug:
+                plan = Plan.objects.get(slug=plan_slug)
+            else:
+                plan = Plan.objects.get(id=plan_id)
         except Plan.DoesNotExist:
             return Response(
-                {"detail": "Invalid plan_id."},
+                {"detail": "Invalid plan."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         # FREE PLAN: no Stripe checkout, just assign locally
         if plan.price_usd == 0 or not plan.stripe_price_id:
-            sub, _ = Subscription.objects.update_or_create(
+            Subscription.objects.update_or_create(
                 user=user,
                 defaults={
                     "plan": plan,
-                    # For free plan we don't need stripe_customer_id / subscription_id
                     "end_date": None,
                 },
             )
@@ -770,7 +954,7 @@ class StripeCheckoutSessionView(views.APIView):
                 customer_email=user.email,
                 line_items=[
                     {
-                        "price": plan.stripe_price_id,  # <-- from Plan model
+                        "price": plan.stripe_price_id,
                         "quantity": 1,
                     }
                 ],
@@ -791,11 +975,15 @@ class StripeCheckoutSessionView(views.APIView):
 
 @method_decorator(csrf_exempt, name="dispatch")
 class StripeWebhookView(views.APIView):
-    permission_classes = []  # Stripe itself calls this; no auth
+    """
+    Receives events from Stripe (via Stripe CLI in dev or real webhooks in prod)
+    and keeps our Subscription model in sync.
+    """
+    permission_classes = []  # Stripe calls this; no auth
 
     def post(self, request, *args, **kwargs):
         payload = request.body
-        sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
+        sig_header = request.META.get("HTTP_STRIPE_SIGNATURE", "")
         webhook_secret = settings.STRIPE_WEBHOOK_SECRET
 
         try:
@@ -815,18 +1003,20 @@ class StripeWebhookView(views.APIView):
         data = event["data"]["object"]
 
         # Import here to avoid circular imports
-        from .models import Subscription, SubscriptionPlan
-        from django.contrib.auth.models import User
+        from .models import Subscription, Plan
 
-        # 1) Checkout completed: new subscription created
+        # ==============================
+        # 1) Checkout completed
+        # ==============================
         if event_type == "checkout.session.completed":
             # Only handle subscription mode
             if data.get("mode") != "subscription":
                 return Response(status=200)
 
-            metadata = data.get("metadata", {}) or {}
+            metadata = data.get("metadata") or {}
             user_id = metadata.get("user_id")
             stripe_sub_id = data.get("subscription")
+
             if not (user_id and stripe_sub_id):
                 return Response(status=200)
 
@@ -835,75 +1025,98 @@ class StripeWebhookView(views.APIView):
             except User.DoesNotExist:
                 return Response(status=200)
 
-            # Fetch subscription from Stripe to get price & period data
-            sub = stripe.Subscription.retrieve(stripe_sub_id)
+            # Fetch full subscription from Stripe
+            try:
+                stripe_sub = stripe.Subscription.retrieve(stripe_sub_id)
+            except Exception:
+                # Don't crash the webhook if Stripe retrieval fails
+                return Response(status=200)
 
-            # Stripe: latest invoice’s line item price id → matches SubscriptionPlan.stripe_id
-            items = sub.get("items", {}).get("data", [])
+            # Get the Price ID used (first line item)
+            items = stripe_sub.get("items", {}).get("data", [])
             price_id = None
             if items:
                 price_id = items[0]["price"]["id"]
 
             plan = None
             if price_id:
-                plan = SubscriptionPlan.objects.filter(stripe_id=price_id).first()
+                plan = Plan.objects.filter(stripe_price_id=price_id).first()
 
-            # Compute period start/end
-            current_period_end = timezone.datetime.fromtimestamp(
-                sub["current_period_end"], tz=timezone.utc
+            # Fallback: use plan_slug from metadata
+            if plan is None:
+                plan_slug = metadata.get("plan_slug")
+                if plan_slug:
+                    plan = Plan.objects.filter(slug=plan_slug).first()
+
+            # Period end -> we use it as Subscription.end_date
+            period_end_ts = stripe_sub.get("current_period_end")
+            end_date = (
+                datetime.fromtimestamp(period_end_ts, tz=timezone.utc)
+                if period_end_ts else None
             )
 
-            # Create or update Subscription
-            subscription_obj, _ = Subscription.objects.update_or_create(
+            start_ts = stripe_sub.get("start_date")
+            start_date = (
+                datetime.fromtimestamp(start_ts, tz=timezone.utc)
+                if start_ts else timezone.now()
+            )
+
+            # Create / update our Subscription row
+            Subscription.objects.update_or_create(
                 user=user,
                 defaults={
                     "plan": plan,
-                    "stripe_sub_id": stripe_sub_id,
-                    "started_at": timezone.datetime.fromtimestamp(
-                        sub["start_date"], tz=timezone.utc
-                    ),
-                    "current_period_end": current_period_end,
-                    "cancelled_at": None,
+                    "stripe_customer_id": stripe_sub.get("customer"),
+                    "stripe_subscription_id": stripe_sub_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
                 },
             )
 
-        # 2) Subscription updated (renewal, plan swap, etc.)
+            return Response(status=200)
+
+        # ==============================
+        # 2) Subscription updated
+        # ==============================
         if event_type == "customer.subscription.updated":
             stripe_sub_id = data["id"]
+
             try:
-                subscription_obj = Subscription.objects.get(stripe_sub_id=stripe_sub_id)
+                sub_obj = Subscription.objects.get(
+                    stripe_subscription_id=stripe_sub_id
+                )
             except Subscription.DoesNotExist:
                 return Response(status=200)
 
-            current_period_end = timezone.datetime.fromtimestamp(
-                data["current_period_end"], tz=timezone.utc
+            end_date = (
+                datetime.fromtimestamp(period_end_ts, tz=timezone.utc)
+                if period_end_ts else None
             )
 
-            # If canceled_at is present, set cancelled_at; otherwise clear it.
-            cancelled_at_value = None
-            if data.get("cancel_at_period_end"):
-                # We consider it "cancelled" at the time it ends, but you could use a different rule.
-                cancelled_at_ts = data.get("canceled_at")
-                if cancelled_at_ts:
-                    cancelled_at_value = timezone.datetime.fromtimestamp(
-                        cancelled_at_ts, tz=timezone.utc
-                    )
 
-            subscription_obj.current_period_end = current_period_end
-            subscription_obj.cancelled_at = cancelled_at_value
-            subscription_obj.save()
+            sub_obj.end_date = end_date
+            sub_obj.save()
+            return Response(status=200)
 
-        # 3) Subscription deleted (hard cancel)
+        # ==============================
+        # 3) Subscription cancelled / deleted
+        # ==============================
         if event_type == "customer.subscription.deleted":
             stripe_sub_id = data["id"]
+
             try:
-                subscription_obj = Subscription.objects.get(stripe_sub_id=stripe_sub_id)
+                sub_obj = Subscription.objects.get(
+                    stripe_subscription_id=stripe_sub_id
+                )
             except Subscription.DoesNotExist:
                 return Response(status=200)
 
-            subscription_obj.cancelled_at = timezone.now()
-            subscription_obj.save()
+            # Consider it ended at "now"
+            sub_obj.end_date = timezone.now()
+            sub_obj.save()
+            return Response(status=200)
 
+        # For all other events we don't care about yet, just 200 OK
         return Response(status=200)
     
 
@@ -923,16 +1136,51 @@ class UsageSummaryView(views.APIView):
 
         plan = get_user_plan(user)  # 👈 this will fallback to free plan
 
+        # Core quota
         ideas_limit = plan.ideas_per_month or 0
         captions_limit = plan.captions_per_month or 0
 
+        # Drafts (total active, not archived)
+        drafts_used = Draft.objects.filter(user=user, archived=False).count()
+        drafts_limit = getattr(plan, "drafts_limit", 0) or 0
+
+        # Media uploads this month
+        uploads_used = MediaUpload.objects.filter(
+            user=user,
+            uploaded_at__year=now.year,
+            uploaded_at__month=now.month,
+        ).count()
+        uploads_limit = getattr(plan, "media_uploads_per_month", 0) or 0
+
+        # Posting reminders this month
+        reminders_used = PostingReminder.objects.filter(
+            user=user,
+            scheduled_at__year=now.year,
+            scheduled_at__month=now.month,
+        ).count()
+        reminders_limit = getattr(plan, "posting_reminders_per_month", 0) or 0
+
         data = {
+            # Ideas / captions
             "ideas_used": usage.ideas_used,
             "ideas_limit": ideas_limit,
             "captions_used": usage.captions_used,
             "captions_limit": captions_limit,
+
+            # Drafts
+            "drafts_used": drafts_used,
+            "drafts_limit": drafts_limit,
+
+            # Media uploads
+            "media_uploads_used": uploads_used,
+            "media_uploads_limit": uploads_limit,
+
+            # Reminders
+            "reminders_used": reminders_used,
+            "reminders_limit": reminders_limit,
         }
         return Response(data, status=status.HTTP_200_OK)
+
     
 class PostingReminderListCreateView(generics.ListCreateAPIView):
     """
@@ -965,7 +1213,20 @@ class PostingReminderListCreateView(generics.ListCreateAPIView):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        user = self.request.user
+
+        # 🚦 plan-based reminders limit (per month)
+        if not check_usage_allowed(user, "reminder", amount=1):
+            raise ValidationError(
+                {
+                    "detail": (
+                        "You've reached your monthly limit of scheduled reminders "
+                        "for your current plan."
+                    )
+                }
+            )
+
+        serializer.save(user=user)
 
 class AIPostingPlanView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -1004,8 +1265,10 @@ class AIPostingPlanView(views.APIView):
         except Exception:
             user_tz = zoneinfo.ZoneInfo("UTC")
 
-        created_slots = []
+        now_utc = timezone.now()
+        valid_slots = []
 
+        # 1️⃣ First pass: normalize datetimes + filter out past ones
         for slot in plan_slots:
             dt_str = slot.get("scheduled_at") or slot.get("datetime")
             if not dt_str:
@@ -1020,23 +1283,48 @@ class AIPostingPlanView(views.APIView):
 
             dt_utc = dt_local.astimezone(zoneinfo.ZoneInfo("UTC"))
 
-            if dt_utc < timezone.now():
+            if dt_utc < now_utc:
                 continue
 
             plat = slot.get("platform", platform)
             title = slot.get("title") or "Planned post"
             notify_flag = bool(slot.get("notify", True))
-
-            # Content-type / note
             note_text = slot.get("note") or title or "Planned post"
 
-            planned_slot, _ = PlannedPostSlot.objects.get_or_create(
-                user=user,
-                platform=plat,
-                scheduled_at=dt_utc,
-                defaults={
+            valid_slots.append(
+                {
+                    "scheduled_at": dt_utc,
+                    "platform": plat,
                     "title": title,
                     "notify": notify_flag,
+                    "note": note_text,
+                }
+            )
+
+        # 2️⃣ Check plan limit for reminders (all new slots at once)
+        if valid_slots:
+            if not check_usage_allowed(user, "reminder", amount=len(valid_slots)):
+                return Response(
+                    {
+                        "detail": (
+                            "This posting plan would exceed your monthly limit of scheduled reminders "
+                            "for your current plan."
+                        )
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        created_slots = []
+
+        # 3️⃣ Second pass: actually create PlannedPostSlot + PostingReminder
+        for vs in valid_slots:
+            planned_slot, _ = PlannedPostSlot.objects.get_or_create(
+                user=user,
+                platform=vs["platform"],
+                scheduled_at=vs["scheduled_at"],
+                defaults={
+                    "title": vs["title"],
+                    "notify": vs["notify"],
                 },
             )
 
@@ -1046,7 +1334,7 @@ class AIPostingPlanView(views.APIView):
                 scheduled_at=planned_slot.scheduled_at,
                 defaults={
                     "platform": planned_slot.platform,
-                    "note": note_text,
+                    "note": vs["note"],
                     "notify_email": planned_slot.notify,
                 },
             )
@@ -1056,7 +1344,9 @@ class AIPostingPlanView(views.APIView):
         data = PlannedPostSlotSerializer(created_slots, many=True).data
 
         # For debugging/UX, return which platforms were used
-        used_platforms = sorted({s["platform"] for s in plan_slots}) or [platform]
+        used_platforms = sorted({s.get("platform", platform) for s in plan_slots}) or [
+            platform
+        ]
 
         return Response(
             {
@@ -1066,6 +1356,7 @@ class AIPostingPlanView(views.APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
     
 class PostingReminderDetailView(views.APIView):
     """
@@ -1299,3 +1590,35 @@ class DetectLanguageView(views.APIView):
         lang = language_from_country_code(country_code)
 
         return Response({"language": lang}, status=status.HTTP_200_OK)
+
+class PlanListView(views.APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        currency = detect_currency_from_request(request)
+        plans = Plan.objects.filter(slug__in=["free", "monthly", "quarterly", "yearly"]).order_by("id")
+
+        data = []
+        for p in plans:
+            local_price = convert_usd_to(currency, p.price_usd)
+            symbol = CURRENCY_MAP.get(currency, CURRENCY_MAP["USD"])["symbol"]
+            data.append(
+                {
+                    "id": p.id,
+                    "slug": p.slug,
+                    "name": p.name,
+                    "price": f"{local_price:.2f}",
+                    "currency": currency,
+                    "currency_symbol": symbol,
+                    # optional: quota info if you want
+                    "ideas_per_month": p.ideas_per_month,
+                    "captions_per_month": p.captions_per_month,
+                    "drafts_limit": p.drafts_limit,
+                    "media_uploads_per_month": p.media_uploads_per_month,
+                    "posting_reminders_per_month": p.posting_reminders_per_month,
+                    "max_upload_mb": p.max_upload_mb,
+                    "max_video_seconds": p.max_video_seconds,
+                }
+            )
+
+        return Response(data)

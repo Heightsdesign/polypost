@@ -10,9 +10,10 @@ from openai import OpenAI
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.utils.timezone import now
+from django.utils import timezone
 
 from .email_templates import POSTLY_EMAIL_TEMPLATE, normalize_lang_code, EMAIL_FOOTER
-from .models import MonthlyUsage, Subscription, Plan
+from .models import MonthlyUsage, Subscription, Plan, Draft, MediaUpload, PostingReminder
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
@@ -290,6 +291,25 @@ def get_or_create_free_plan():
     )
     return free
 
+
+def get_or_create_free_plan():
+    """
+    Assuming you already have this somewhere; if not,
+    implement it to return the 'free' Plan.
+    """
+    plan, _ = Plan.objects.get_or_create(
+        slug="free",
+        defaults={
+            "name": "Free",
+            "price_usd": 0,
+            "ideas_per_month": 20,
+            "captions_per_month": 10,
+            # if you added extra fields, you can also set defaults here
+        },
+    )
+    return plan
+
+
 def get_user_plan(user):
     sub = getattr(user, "subscription", None)
     if sub and sub.plan:
@@ -311,31 +331,92 @@ def get_current_usage(user):
 
 def check_usage_allowed(user, kind: str, amount: int = 1) -> bool:
     """
-    kind = "idea" or "caption"
-    amount = how many units we want to consume (e.g. 5 ideas per generation)
+    kind:
+      - 'idea'
+      - 'caption'
+      - 'draft'
+      - 'media_upload'
+      - 'reminder'
+
+    amount = how many units we want to consume.
     """
-    plan = get_user_plan(user)          # never None now
-    usage = get_current_usage(user)
+    plan = get_user_plan(user)  # never None now
 
-    if kind == "idea":
-        limit = plan.ideas_per_month or 0
-        # allow only if after this call we are still <= limit
-        return usage.ideas_used + amount <= limit
+    # -----------------------------------------
+    # 1) Per-month counters: ideas / captions
+    # -----------------------------------------
+    if kind in ("idea", "caption"):
+        usage = get_current_usage(user)
 
-    elif kind == "caption":
-        limit = plan.captions_per_month or 0
-        return usage.captions_used + amount <= limit
+        if kind == "idea":
+            limit = plan.ideas_per_month or 0
+            # allow only if after this call we are still <= limit
+            return usage.ideas_used + amount <= limit
 
-    # unknown kind → block
-    return False
+        if kind == "caption":
+            limit = plan.captions_per_month or 0
+            return usage.captions_used + amount <= limit
+
+    # -----------------------------------------
+    # 2) Total active drafts (not archived)
+    # -----------------------------------------
+    if kind == "draft":
+        # Plan must have a drafts_limit field (int)
+        limit = getattr(plan, "drafts_limit", 0)
+        if not limit:
+            # 0 or None = considered unlimited (for safety)
+            return True
+
+        active_count = Draft.objects.filter(user=user, archived=False).count()
+        return active_count + amount <= limit
+
+    # -----------------------------------------
+    # 3) Monthly media uploads
+    # -----------------------------------------
+    if kind == "media_upload":
+        # Plan must have media_uploads_per_month (int)
+        limit = getattr(plan, "media_uploads_per_month", 0)
+        if not limit:
+            return True
+
+        now = timezone.now()
+        uploads_this_month = MediaUpload.objects.filter(
+            user=user,
+            uploaded_at__year=now.year,
+            uploaded_at__month=now.month,
+        ).count()
+        return uploads_this_month + amount <= limit
+
+    # -----------------------------------------
+    # 4) Monthly posting reminders
+    # -----------------------------------------
+    if kind == "reminder":
+        # Plan must have posting_reminders_per_month (int)
+        limit = getattr(plan, "posting_reminders_per_month", 0)
+        if not limit:
+            return True
+
+        now = timezone.now()
+        reminders_this_month = PostingReminder.objects.filter(
+            user=user,
+            scheduled_at__year=now.year,
+            scheduled_at__month=now.month,
+        ).count()
+        return reminders_this_month + amount <= limit
+
+    # unknown kind → allow (safer than blocking everything)
+    return True
 
 
 def increment_usage(user, kind: str, amount: int = 1):
     """
     Increment usage counters and send upgrade nudges when limits are hit.
-    """
-    from .tasks import send_postly_email_task
 
+    NOTE:
+      - We ONLY keep monthly counters (and emails) for ideas / captions.
+      - Draft, media, reminders limits are enforced by counting rows,
+        so they don't need persisted counters here.
+    """
     plan = get_user_plan(user)
     usage = get_current_usage(user)
 
@@ -344,6 +425,7 @@ def increment_usage(user, kind: str, amount: int = 1):
 
     # ---- APPLY USAGE INCREASE ----
     if kind == "idea":
+        before = usage.ideas_used
         usage.ideas_used += amount
         usage.save()
 
@@ -352,8 +434,8 @@ def increment_usage(user, kind: str, amount: int = 1):
         # If limit reached/exceeded → send upgrade email ONCE
         if limit > 0 and usage.ideas_used >= limit:
             # avoid sending multiple nudges in the same month
-            if usage.ideas_used - amount < limit:  
-                send_postly_email_task.delay(
+            if before < limit:
+                send_postly_email.delay(
                     user.email,
                     "You've reached your monthly idea limit",
                     (
@@ -365,6 +447,7 @@ def increment_usage(user, kind: str, amount: int = 1):
                 )
 
     elif kind == "caption":
+        before = usage.captions_used
         usage.captions_used += amount
         usage.save()
 
@@ -372,8 +455,8 @@ def increment_usage(user, kind: str, amount: int = 1):
 
         if limit > 0 and usage.captions_used >= limit:
             # only fire the email on the EXACT step crossing the limit
-            if usage.captions_used - amount < limit:
-                send_postly_email_task.delay(
+            if before < limit:
+                send_postly_email.delay(
                     user.email,
                     "You've reached your monthly caption limit",
                     (
@@ -383,15 +466,6 @@ def increment_usage(user, kind: str, amount: int = 1):
                     "View plans",
                     pricing_url,
                 )
-
-def user_has_active_subscription(user):
-    if not user.is_authenticated:
-        return False
-    try:
-        sub = user.subscription  # OneToOne
-    except Subscription.DoesNotExist:
-        return False
-    return sub.is_active()
 
 def build_brand_personas(
     niche: str,

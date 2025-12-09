@@ -1,12 +1,28 @@
 // src/pages/PricingPage.tsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api";
 import { t } from "../i18n/translations";
 import { useLanguage } from "../i18n/LanguageContext";
 
+type BackendPlan = {
+  id: number;
+  slug: string;
+  name: string;
+  price: string; // local numeric string, e.g. "12.00"
+  currency: string; // "USD", "EUR", ...
+  currency_symbol: string; // "$", "€", ...
+  ideas_per_month: number;
+  captions_per_month: number;
+  drafts_limit: number;
+  media_uploads_per_month: number;
+  posting_reminders_per_month: number;
+  max_upload_mb: number;
+  max_video_seconds: number;
+};
+
 type PlanCard = {
-  id?: number; // DB id for paid plans
+  id?: number;
   slug: string;
   name: string;
   priceLabel: string;
@@ -21,13 +37,82 @@ export default function PricingPage() {
   const { lang } = useLanguage();
   const [loadingSlug, setLoadingSlug] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [backendPlans, setBackendPlans] = useState<BackendPlan[] | null>(null);
+  const [loadingPlans, setLoadingPlans] = useState(false);
 
-  // Build plans with translated labels
-  const plans: PlanCard[] = [
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPlans() {
+      setLoadingPlans(true);
+      setError("");
+      try {
+        const res = await api.get<BackendPlan[]>("/billing/plans/");
+        if (!cancelled) {
+          setBackendPlans(res.data || []);
+        }
+      } catch (err) {
+        console.error("Failed to load billing plans", err);
+        if (!cancelled) {
+          setBackendPlans(null);
+        }
+      } finally {
+        if (!cancelled) setLoadingPlans(false);
+      }
+    }
+
+    loadPlans();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function findBackendPlan(slug: string): BackendPlan | undefined {
+    if (!backendPlans) return undefined;
+    return backendPlans.find((p) => p.slug === slug);
+  }
+
+  function formatPrice(planSlug: string, backendPlan?: BackendPlan): string {
+    // ✅ Free plan: use backend currency symbol if available
+    if (planSlug === "free") {
+      if (backendPlan) {
+        // keep same pattern as paid plans: symbol before number
+        return `${backendPlan.currency_symbol}0`;
+      }
+      // fallback to translated static label if backend not loaded
+      return t(lang, "pricing_plan_free_price");
+    }
+
+    if (!backendPlan) {
+      // fallback to translated USD-ish label if backend not available
+      switch (planSlug) {
+        case "monthly":
+          return t(lang, "pricing_plan_monthly_price");
+        case "quarterly":
+          return t(lang, "pricing_plan_quarterly_price");
+        case "yearly":
+          return t(lang, "pricing_plan_yearly_price");
+        default:
+          return "$—";
+      }
+    }
+
+    const num = Number(backendPlan.price);
+    const trimmed =
+      Number.isNaN(num)
+        ? backendPlan.price
+        : Number.isInteger(num)
+        ? num.toString()
+        : num.toFixed(2);
+
+    // standard formatting: symbol before number (e.g. €10.99, $12)
+    return `${backendPlan.currency_symbol}${trimmed}`;
+  }
+
+  const basePlans: Omit<PlanCard, "id" | "priceLabel">[] = [
     {
       slug: "free",
       name: t(lang, "pricing_plan_free_name"),
-      priceLabel: t(lang, "pricing_plan_free_price"),
       periodLabel: t(lang, "pricing_plan_free_period"),
       description: t(lang, "pricing_plan_free_description"),
       features: [
@@ -42,7 +127,6 @@ export default function PricingPage() {
     {
       slug: "monthly",
       name: t(lang, "pricing_plan_monthly_name"),
-      priceLabel: t(lang, "pricing_plan_monthly_price"),
       periodLabel: t(lang, "pricing_plan_monthly_period"),
       description: t(lang, "pricing_plan_monthly_description"),
       features: [
@@ -53,13 +137,10 @@ export default function PricingPage() {
         t(lang, "pricing_plan_monthly_feature_storage"),
       ],
       highlight: t(lang, "pricing_plan_monthly_highlight"),
-      // ⚠️ replace with the real Plan.id from your DB
-      id: 2,
     },
     {
       slug: "quarterly",
       name: t(lang, "pricing_plan_quarterly_name"),
-      priceLabel: t(lang, "pricing_plan_quarterly_price"),
       periodLabel: t(lang, "pricing_plan_quarterly_period"),
       description: t(lang, "pricing_plan_quarterly_description"),
       features: [
@@ -70,13 +151,10 @@ export default function PricingPage() {
         t(lang, "pricing_plan_quarterly_feature_storage"),
       ],
       highlight: t(lang, "pricing_plan_quarterly_highlight"),
-      // ⚠️ replace with the real Plan.id from your DB
-      id: 3,
     },
     {
       slug: "yearly",
       name: t(lang, "pricing_plan_yearly_name"),
-      priceLabel: t(lang, "pricing_plan_yearly_price"),
       periodLabel: t(lang, "pricing_plan_yearly_period"),
       description: t(lang, "pricing_plan_yearly_description"),
       features: [
@@ -87,11 +165,18 @@ export default function PricingPage() {
         t(lang, "pricing_plan_yearly_feature_storage"),
       ],
       highlight: t(lang, "pricing_plan_yearly_highlight"),
-      // ⚠️ replace with the real Plan.id from your DB
-      id: 4,
     },
   ];
 
+  const plans: PlanCard[] = basePlans.map((p) => {
+    const backendPlan = findBackendPlan(p.slug);
+    return {
+      ...p,
+      id: backendPlan?.id,
+      priceLabel: formatPrice(p.slug, backendPlan),
+    };
+  });
+  
   async function handleCheckout(plan: PlanCard) {
     setError("");
 
@@ -101,16 +186,12 @@ export default function PricingPage() {
       return;
     }
 
-    if (!plan.id) {
-      setError(t(lang, "pricing_error_not_configured"));
-      return;
-    }
-
     try {
       setLoadingSlug(plan.slug);
 
+      // 👇 send slug instead of id
       const res = await api.post("/billing/create-checkout-session/", {
-        plan_id: plan.id,
+        plan_slug: plan.slug,
       });
 
       if (res.data.checkout_url) {
@@ -132,9 +213,9 @@ export default function PricingPage() {
     }
   }
 
+
   return (
     <div className="relative overflow-hidden min-h-screen bg-offwhite px-4 md:px-8 py-10 md:py-16">
-      {/* Soft background aura like landing */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
@@ -148,7 +229,6 @@ export default function PricingPage() {
       />
 
       <div className="relative z-10 max-w-6xl mx-auto">
-        {/* Header */}
         <header className="text-center mb-10 md:mb-14">
           <p className="text-[11px] font-semibold tracking-[0.2em] uppercase text-purple/80 mb-2">
             {t(lang, "pricing_header_badge")}
@@ -161,18 +241,18 @@ export default function PricingPage() {
           </p>
         </header>
 
-        {/* Error banner (if any) */}
         {error && (
           <div className="mb-6 max-w-3xl mx-auto rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
           </div>
         )}
 
-        {/* Plans grid */}
         <section className="grid gap-6 md:gap-8 md:grid-cols-2 xl:grid-cols-4">
           {plans.map((plan) => {
             const isPopular = plan.slug === "monthly";
             const loading = loadingSlug === plan.slug;
+            const backendMissing =
+              !plan.isFree && !findBackendPlan(plan.slug) && !loadingPlans;
 
             return (
               <div
@@ -210,7 +290,6 @@ export default function PricingPage() {
                   ))}
                 </ul>
 
-                {/* CTA */}
                 {plan.isFree ? (
                   <Link
                     to="/register"
@@ -222,10 +301,14 @@ export default function PricingPage() {
                   <button
                     type="button"
                     onClick={() => handleCheckout(plan)}
-                    disabled={loading}
+                    disabled={loading || backendMissing || loadingPlans}
                     className="inline-flex items-center justify-center w-full px-4 py-2.5 rounded-2xl text-sm font-semibold text-white bg-gradient-to-r from-purple to-pink shadow-md shadow-purple/30 hover:shadow-purple/40 hover:-translate-y-[1px] active:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
                   >
-                    {loading ? "Redirecting…" : "Choose plan"}
+                    {loading
+                      ? t(lang, "pricing_plan_paid_cta_loading")
+                      : backendMissing
+                      ? t(lang, "pricing_error_not_configured")
+                      : t(lang, "pricing_plan_paid_cta")}
                   </button>
                 )}
               </div>
@@ -233,7 +316,6 @@ export default function PricingPage() {
           })}
         </section>
 
-        {/* Small reassurance footnote */}
         <p className="mt-8 text-[11px] text-center text-dark/50">
           {t(lang, "pricing_footer_note")}
         </p>

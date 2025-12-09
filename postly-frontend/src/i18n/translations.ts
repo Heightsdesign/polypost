@@ -694,6 +694,8 @@ export const translations: Record<SupportedLang, Record<string, string>> = {
 
     pricing_footer_note:
       "Payments are handled securely by Stripe. You can cancel your subscription at any time.",
+    pricing_plan_paid_cta: "Choose plan",
+    pricing_plan_paid_cta_loading: "Redirecting…",
 
     },
 
@@ -1435,6 +1437,9 @@ export const translations: Record<SupportedLang, Record<string, string>> = {
 
     pricing_footer_note:
       "Les paiements sont gérés de façon sécurisée par Stripe. Tu peux annuler ton abonnement à tout moment.",
+
+    pricing_plan_paid_cta: "Choisir cette offre",
+    pricing_plan_paid_cta_loading: "Redirection…",
 
 
     },
@@ -2181,6 +2186,9 @@ export const translations: Record<SupportedLang, Record<string, string>> = {
     pricing_footer_note:
       "Los pagos se procesan de forma segura con Stripe. Puedes cancelar tu suscripción en cualquier momento.",
 
+    pricing_plan_paid_cta: "Tarif wählen",
+    pricing_plan_paid_cta_loading: "Weiterleiten…",
+
 
       },
 
@@ -2924,7 +2932,9 @@ export const translations: Record<SupportedLang, Record<string, string>> = {
 
     pricing_footer_note:
       "Os pagamentos são processados com segurança pela Stripe. Você pode cancelar a assinatura a qualquer momento.",
-
+    
+    pricing_plan_paid_cta: "Elegir plan",
+    pricing_plan_paid_cta_loading: "Redirigiendo…",
 
     },
 };

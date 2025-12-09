@@ -14,7 +14,7 @@ from .views import (
     ApplyUseCaseTemplateView, MeProfileView, UsageSummaryView, PostingReminderListCreateView,
     AIPostingPlanView, PostingReminderDetailView, NotificationListView,
     NotificationUnreadCountView, IdeaActionPlanView, BioVariantsView,
-    DetectLanguageView
+    DetectLanguageView, PlanListView,
     )
 from .views_auth import PasswordResetRequestView, PasswordResetConfirmView, LoginView, EmailConfirmView, ChangePasswordView, NewsletterSendView
 
@@ -58,11 +58,20 @@ urlpatterns = [
         name="notifications-list",
     ),
 
-
     path("analytics/ingest/", AnalyticsIngestView.as_view(), name="analytics-ingest"),
-    path("billing/create-checkout-session/", StripeCheckoutSessionView.as_view(), name="stripe-checkout"),
-    path("billing/webhook/", StripeWebhookView.as_view(), name="stripe-webhook"),
+    path(
+        "billing/create-checkout-session/",
+        StripeCheckoutSessionView.as_view(),
+        name="stripe-create-checkout-session",
+    ),
+    path(
+        "billing/webhook/",
+        StripeWebhookView.as_view(),
+        name="stripe-webhook",
+    ),
     path("billing/me/", MySubscriptionView.as_view(), name="billing-me"),
+    path("billing/plans/", PlanListView.as_view(), name="billing-plans"),
+
     path("drafts/", DraftListCreateView.as_view(), name="draft-list-create"),
     path("drafts/<uuid:pk>/pin/", DraftPinView.as_view(), name="draft-pin"),
     path("drafts/<uuid:pk>/archive/", DraftArchiveView.as_view(), name="draft-archive"),

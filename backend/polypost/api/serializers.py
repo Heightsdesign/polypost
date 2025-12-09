@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import MediaUpload, GeneratedCaption, PlannedPostSlot, PostPerformance, Draft, MediaUpload, GeneratedCaption, CreatorProfile, UseCaseTemplate, PostingReminder, Notification
+from .models import MediaUpload, GeneratedCaption, PlannedPostSlot, PostPerformance, Draft, MediaUpload, GeneratedCaption, CreatorProfile, UseCaseTemplate, PostingReminder, Notification, Plan
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -263,3 +263,20 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     def get_is_read(self, obj):
         return obj.read_at is not None
+    
+class PlanSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Plan
+        fields = [
+            "id",
+            "slug",
+            "name",
+            "price_usd",
+            "ideas_per_month",
+            "captions_per_month",
+            "drafts_limit",
+            "media_uploads_per_month",
+            "posting_reminders_per_month",
+            "max_upload_mb",
+            "max_video_seconds",
+        ]

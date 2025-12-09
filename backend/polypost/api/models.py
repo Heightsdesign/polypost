@@ -303,14 +303,28 @@ class PostPerformance(models.Model):
         default="manual",
     )  # "manual", "instagram_api", "agent"
     created_at = models.DateTimeField(auto_now_add=True)
-
+    
+# api/models.py
 class Plan(models.Model):
-    slug = models.CharField(max_length=50, unique=True)  # "free", "pro"
+    slug = models.CharField(max_length=50, unique=True)  # "free", "monthly", "quarterly", "yearly"
     name = models.CharField(max_length=100)
     price_usd = models.DecimalField(max_digits=6, decimal_places=2, default=0)
     stripe_price_id = models.CharField(max_length=200, blank=True, null=True)
+
+    # core usage
     ideas_per_month = models.IntegerField(default=50)
     captions_per_month = models.IntegerField(default=30)
+
+    # NEW: hard limits / extra quotas
+    drafts_limit = models.IntegerField(default=50)
+    media_uploads_per_month = models.IntegerField(default=30)
+    posting_reminders_per_month = models.IntegerField(default=30)
+
+    # upload constraints (per file)
+    max_upload_mb = models.IntegerField(default=25)
+    max_video_seconds = models.IntegerField(default=90)
+
+
 
 class Subscription(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
