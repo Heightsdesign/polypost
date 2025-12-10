@@ -32,8 +32,7 @@ from .serializers import (
 
 from .utils import (
     build_caption_prompt, get_seasonal_hooks, get_floating_event_hooks,
-    get_trending_stub_hooks, get_trending_topics, get_trending_movies_from_tmdb,
-    get_user_plan, generate_idea_action_plan
+    get_trending_stub_hooks, get_or_create_free_plan, get_user_plan, generate_idea_action_plan
     )
 
 from .utils import check_usage_allowed, increment_usage, send_postly_email
@@ -41,7 +40,6 @@ from .utils import check_usage_allowed, increment_usage, send_postly_email
 from .geo_utils import get_country_code_from_ip, language_from_country_code
 
 from django.contrib.auth.models import User
-from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
@@ -54,11 +52,13 @@ from django.conf import settings
 
 
 from openai import OpenAI
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal, ROUND_HALF_UP
 
 from .scheduling_utils import generate_posting_suggestions, generate_ai_posting_plan
 from .email_templates import get_email_text, normalize_lang_code
+
+from .tasks import send_postly_email_task
 
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # or use decouple
@@ -589,7 +589,7 @@ class PlanSlotView(views.APIView):
         dt_utc = dt_local.astimezone(zoneinfo.ZoneInfo("UTC"))
 
         # don't allow scheduling in the past
-        if dt_utc < timezone.now():
+        if dt_utc < dt_timezone.now():
             return Response(
                 {"detail": "scheduled_at is in the past"},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -612,7 +612,7 @@ class MyPlannedSlotsView(views.APIView):
     def get(self, request, *args, **kwargs):
         user = request.user
         # we can filter future ones
-        qs = PlannedPostSlot.objects.filter(user=user, scheduled_at__gte=timezone.now()).order_by("scheduled_at")
+        qs = PlannedPostSlot.objects.filter(user=user, scheduled_at__gte=dt_timezone.now()).order_by("scheduled_at")
         data = PlannedPostSlotSerializer(qs, many=True).data
         return Response(data, status=status.HTTP_200_OK)
     
@@ -640,7 +640,7 @@ class SchedulerSuggestionsView(views.APIView):
         except Exception:
             user_tz = zoneinfo.ZoneInfo("UTC")
 
-        today = timezone.now().date()
+        today = dt_timezone.now().date()
 
         result_days = []
 
@@ -733,23 +733,49 @@ class AnalyticsIngestView(views.APIView):
 
 
     
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import permissions
+
+from .models import Subscription, Plan
+
+
 class MySubscriptionView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        sub = Subscription.objects.filter(user=request.user).first()
-        if not sub or not sub.is_active():
-            # return free
-            plan = Plan.objects.filter(slug="free").first()
-            return Response({
-                "plan": plan.slug if plan else "free",
-                "is_active": False,
-            })
+        sub = (
+            Subscription.objects
+            .filter(user=request.user)
+            .select_related("plan")
+            .first()
+        )
 
-        return Response({
-            "plan": sub.plan.slug if sub.plan else "free",
-            "is_active": sub.is_active(),
-        })
+        # No subscription or completely inactive => treat as free
+        if not sub or not sub.is_active() or not sub.plan:
+            free_plan = Plan.objects.filter(slug="free").first()
+            return Response(
+                {
+                    "plan": free_plan.slug if free_plan else "free",
+                    "plan_name": free_plan.name if free_plan else "Free",
+                    "is_active": False,
+                    "will_cancel_at_period_end": False,
+                    "current_period_end": None,
+                }
+            )
+
+        # Active subscription
+        return Response(
+            {
+                "plan": sub.plan.slug,              # e.g. "monthly", "quarterly", "yearly"
+                "plan_name": sub.plan.name,         # e.g. "Pro – Monthly"
+                "is_active": sub.is_active(),       # True while end_date in future
+                "will_cancel_at_period_end": getattr(
+                    sub, "will_cancel_at_period_end", False
+                ),
+                "current_period_end": sub.end_date,  # DRF will serialize as ISO string
+            }
+        )
 
 
 class DraftListCreateView(generics.ListCreateAPIView):
@@ -972,18 +998,14 @@ class StripeCheckoutSessionView(views.APIView):
             )
 
         return Response({"checkout_url": checkout_session.url}, status=status.HTTP_200_OK)
-
+    
 @method_decorator(csrf_exempt, name="dispatch")
 class StripeWebhookView(views.APIView):
-    """
-    Receives events from Stripe (via Stripe CLI in dev or real webhooks in prod)
-    and keeps our Subscription model in sync.
-    """
-    permission_classes = []  # Stripe calls this; no auth
+    permission_classes = []  # Stripe itself calls this; no auth
 
     def post(self, request, *args, **kwargs):
         payload = request.body
-        sig_header = request.META.get("HTTP_STRIPE_SIGNATURE", "")
+        sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")
         webhook_secret = settings.STRIPE_WEBHOOK_SECRET
 
         try:
@@ -993,30 +1015,21 @@ class StripeWebhookView(views.APIView):
                 secret=webhook_secret,
             )
         except ValueError:
-            # Invalid payload
             return Response(status=400)
         except stripe.error.SignatureVerificationError:
-            # Invalid signature
             return Response(status=400)
 
         event_type = event["type"]
         data = event["data"]["object"]
 
-        # Import here to avoid circular imports
-        from .models import Subscription, Plan
-
-        # ==============================
-        # 1) Checkout completed
-        # ==============================
+        # 1) Checkout completed: create or update local Subscription
         if event_type == "checkout.session.completed":
-            # Only handle subscription mode
             if data.get("mode") != "subscription":
                 return Response(status=200)
 
-            metadata = data.get("metadata") or {}
+            metadata = data.get("metadata", {}) or {}
             user_id = metadata.get("user_id")
             stripe_sub_id = data.get("subscription")
-
             if not (user_id and stripe_sub_id):
                 return Response(status=200)
 
@@ -1025,100 +1038,87 @@ class StripeWebhookView(views.APIView):
             except User.DoesNotExist:
                 return Response(status=200)
 
-            # Fetch full subscription from Stripe
-            try:
-                stripe_sub = stripe.Subscription.retrieve(stripe_sub_id)
-            except Exception:
-                # Don't crash the webhook if Stripe retrieval fails
-                return Response(status=200)
+            stripe_sub = stripe.Subscription.retrieve(stripe_sub_id)
 
-            # Get the Price ID used (first line item)
             items = stripe_sub.get("items", {}).get("data", [])
-            price_id = None
-            if items:
-                price_id = items[0]["price"]["id"]
-
+            price_id = items[0]["price"]["id"] if items else None
             plan = None
             if price_id:
                 plan = Plan.objects.filter(stripe_price_id=price_id).first()
 
-            # Fallback: use plan_slug from metadata
-            if plan is None:
-                plan_slug = metadata.get("plan_slug")
-                if plan_slug:
-                    plan = Plan.objects.filter(slug=plan_slug).first()
-
-            # Period end -> we use it as Subscription.end_date
             period_end_ts = stripe_sub.get("current_period_end")
             end_date = (
-                datetime.fromtimestamp(period_end_ts, tz=timezone.utc)
-                if period_end_ts else None
+                datetime.fromtimestamp(period_end_ts, tz=dt_timezone.utc)
+                if period_end_ts
+                else None
             )
 
             start_ts = stripe_sub.get("start_date")
             start_date = (
-                datetime.fromtimestamp(start_ts, tz=timezone.utc)
-                if start_ts else timezone.now()
+                datetime.fromtimestamp(start_ts, tz=dt_timezone.utc)
+                if start_ts
+                else dj_timezone.now()
             )
 
-            # Create / update our Subscription row
+            cancel_at_period_end = bool(stripe_sub.get("cancel_at_period_end", False))
+
             Subscription.objects.update_or_create(
                 user=user,
                 defaults={
                     "plan": plan,
-                    "stripe_customer_id": stripe_sub.get("customer"),
                     "stripe_subscription_id": stripe_sub_id,
                     "start_date": start_date,
                     "end_date": end_date,
+                    "will_cancel_at_period_end": cancel_at_period_end,
                 },
             )
 
-            return Response(status=200)
-
-        # ==============================
-        # 2) Subscription updated
-        # ==============================
-        if event_type == "customer.subscription.updated":
+        # 2) Subscription updated (renewal, cancel_at_period_end toggled, plan swaps…)
+        elif event_type == "customer.subscription.updated":
             stripe_sub_id = data["id"]
-
             try:
-                sub_obj = Subscription.objects.get(
-                    stripe_subscription_id=stripe_sub_id
-                )
+                sub_obj = Subscription.objects.get(stripe_subscription_id=stripe_sub_id)
             except Subscription.DoesNotExist:
                 return Response(status=200)
 
+            period_end_ts = data.get("current_period_end")
             end_date = (
-                datetime.fromtimestamp(period_end_ts, tz=timezone.utc)
-                if period_end_ts else None
+                datetime.fromtimestamp(period_end_ts, tz=dt_timezone.utc)
+                if period_end_ts
+                else None
             )
 
+            cancel_at_period_end = bool(data.get("cancel_at_period_end", False))
+
+            # Optionally update plan in case of upgrade/downgrade
+            items = data.get("items", {}).get("data", [])
+            price_id = items[0]["price"]["id"] if items else None
+            if price_id:
+                plan = Plan.objects.filter(stripe_price_id=price_id).first()
+            else:
+                plan = None
+
+            if plan:
+                sub_obj.plan = plan
 
             sub_obj.end_date = end_date
+            sub_obj.will_cancel_at_period_end = cancel_at_period_end
             sub_obj.save()
-            return Response(status=200)
 
-        # ==============================
-        # 3) Subscription cancelled / deleted
-        # ==============================
-        if event_type == "customer.subscription.deleted":
+        # 3) Subscription deleted (immediate cancellation on Stripe side)
+        elif event_type == "customer.subscription.deleted":
             stripe_sub_id = data["id"]
-
             try:
-                sub_obj = Subscription.objects.get(
-                    stripe_subscription_id=stripe_sub_id
-                )
+                sub_obj = Subscription.objects.get(stripe_subscription_id=stripe_sub_id)
             except Subscription.DoesNotExist:
                 return Response(status=200)
 
-            # Consider it ended at "now"
-            sub_obj.end_date = timezone.now()
+            sub_obj.end_date = dj_timezone.now()
+            sub_obj.will_cancel_at_period_end = False
             sub_obj.save()
-            return Response(status=200)
 
-        # For all other events we don't care about yet, just 200 OK
         return Response(status=200)
-    
+
 
 class UsageSummaryView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -1265,7 +1265,7 @@ class AIPostingPlanView(views.APIView):
         except Exception:
             user_tz = zoneinfo.ZoneInfo("UTC")
 
-        now_utc = timezone.now()
+        now_utc = dt_timezone.now()
         valid_slots = []
 
         # 1️⃣ First pass: normalize datetimes + filter out past ones
@@ -1622,3 +1622,71 @@ class PlanListView(views.APIView):
             )
 
         return Response(data)
+
+class CancelSubscriptionView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+
+        sub = Subscription.objects.filter(
+            user=user,
+            stripe_subscription_id__isnull=False,
+            plan__isnull=False,
+        ).first()
+
+        if not sub or not sub.is_active():
+            return Response(
+                {"detail": "No active paid subscription to cancel."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            stripe_sub = stripe.Subscription.modify(
+                sub.stripe_subscription_id,
+                cancel_at_period_end=True,
+            )
+        except Exception as e:
+            return Response(
+                {"detail": f"Stripe error: {e}"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        # Get end-of-period date from Stripe
+        period_end_ts = stripe_sub.get("current_period_end")
+        end_date = (
+            datetime.fromtimestamp(period_end_ts, tz=dt_timezone.utc)
+            if period_end_ts
+            else None
+        )
+
+        sub.will_cancel_at_period_end = True
+        if end_date:
+            sub.end_date = end_date
+        sub.save()
+
+        # Send confirmation email
+        frontend = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
+        account_url = f"{frontend}/account"
+        end_date_str = end_date.strftime("%Y-%m-%d") if end_date else ""
+
+        send_postly_email_task.delay(
+            user.email,
+            "Your Polypost subscription will be cancelled",
+            (
+                "Hi,<br><br>"
+                "This is a confirmation that your Polypost subscription will not renew.<br>"
+                f"Your access to Pro features remains active until <b>{end_date_str}</b>.<br><br>"
+                "You can manage your account anytime from your dashboard."
+            ),
+            "Manage account",
+            account_url,
+        )
+
+        return Response(
+            {
+                "detail": "Subscription will be cancelled at the end of the current period.",
+                "end_date": end_date.isoformat() if end_date else None,
+            },
+            status=status.HTTP_200_OK,
+        )

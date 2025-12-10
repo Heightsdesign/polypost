@@ -697,6 +697,15 @@ export const translations: Record<SupportedLang, Record<string, string>> = {
     pricing_plan_paid_cta: "Choose plan",
     pricing_plan_paid_cta_loading: "Redirecting…",
 
+    account_billing_on_pro_cancel_scheduled: "Your Pro subscription will not renew. It will end on",
+    account_billing_on_pro_cancel_scheduled_no_date: "Your Pro subscription will not renew at the end of the current billing period.",
+    account_billing_cancel_button: "Cancel subscription",
+    account_billing_cancel_confirm: "Are you sure you want to cancel your Pro subscription? You will keep access until the end of the current billing period.",
+    account_billing_cancel_confirm_button: "Yes, cancel Pro",
+    account_billing_cancel_keep_pro_button: "Keep Pro",
+    account_billing_cancel_loading: "Cancelling…",
+    account_billing_cancel_error: "We could not cancel your subscription. Please try again or contact support."
+
     },
 
   fr: {
@@ -1440,6 +1449,16 @@ export const translations: Record<SupportedLang, Record<string, string>> = {
 
     pricing_plan_paid_cta: "Choisir cette offre",
     pricing_plan_paid_cta_loading: "Redirection…",
+    
+    account_billing_on_pro_cancel_scheduled: "Votre abonnement Pro ne sera pas renouvelé. Il prendra fin le",
+    account_billing_on_pro_cancel_scheduled_no_date: "Votre abonnement Pro ne sera pas renouvelé à la fin de la période de facturation en cours.",
+    account_billing_cancel_button: "Annuler l’abonnement",
+    account_billing_cancel_confirm: "Êtes-vous sûr de vouloir annuler votre abonnement Pro ? Vous conserverez l’accès jusqu’à la fin de la période de facturation actuelle.",
+    account_billing_cancel_confirm_button: "Oui, annuler Pro",
+    account_billing_cancel_keep_pro_button: "Garder Pro",
+    account_billing_cancel_loading: "Annulation…",
+    account_billing_cancel_error: "Nous n’avons pas pu annuler votre abonnement. Veuillez réessayer ou contacter le support."
+
 
 
     },
@@ -2189,7 +2208,14 @@ export const translations: Record<SupportedLang, Record<string, string>> = {
     pricing_plan_paid_cta: "Tarif wählen",
     pricing_plan_paid_cta_loading: "Weiterleiten…",
 
-
+    account_billing_on_pro_cancel_scheduled: "Tu suscripción Pro no se renovará. Finalizará el",
+    account_billing_on_pro_cancel_scheduled_no_date: "Tu suscripción Pro no se renovará al final del periodo de facturación actual.",
+    account_billing_cancel_button: "Cancelar suscripción",
+    account_billing_cancel_confirm: "¿Estás seguro de que deseas cancelar tu suscripción Pro? Mantendrás el acceso hasta el final del periodo de facturación actual.",
+    account_billing_cancel_confirm_button: "Sí, cancelar Pro",
+    account_billing_cancel_keep_pro_button: "Mantener Pro",
+    account_billing_cancel_loading: "Cancelando…",
+    account_billing_cancel_error: "No pudimos cancelar tu suscripción. Inténtalo nuevamente o contacta al soporte."
       },
 
   pt: {
@@ -2935,6 +2961,17 @@ export const translations: Record<SupportedLang, Record<string, string>> = {
     
     pricing_plan_paid_cta: "Elegir plan",
     pricing_plan_paid_cta_loading: "Redirigiendo…",
+
+    account_billing_on_pro_cancel_scheduled: "Sua assinatura Pro não será renovada. Ela terminará em",
+    account_billing_on_pro_cancel_scheduled_no_date: "Sua assinatura Pro não será renovada ao final do período de cobrança atual.",
+    account_billing_cancel_button: "Cancelar assinatura",
+    account_billing_cancel_confirm: "Tem certeza de que deseja cancelar sua assinatura Pro? Você manterá o acesso até o final do período de cobrança atual.",
+    account_billing_cancel_confirm_button: "Sim, cancelar Pro",
+    account_billing_cancel_keep_pro_button: "Manter Pro",
+    account_billing_cancel_loading: "Cancelando…",
+    account_billing_cancel_error: "Não foi possível cancelar sua assinatura. Tente novamente ou entre em contato com o suporte."
+
+    
 
     },
 };

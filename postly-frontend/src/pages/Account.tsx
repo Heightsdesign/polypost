@@ -34,10 +34,14 @@ export default function Account() {
   const [notifyEmail, setNotifyEmail] = useState(true);
   const [notifyPush, setNotifyPush] = useState(false);
 
-  // billing
+   // billing
   const [billingLoading, setBillingLoading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<"free" | "pro" | string>("free");
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [planEndDate, setPlanEndDate] = useState<string | null>(null);
+  const [willCancel, setWillCancel] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
 
   // security
   const [oldPassword, setOldPassword] = useState("");
@@ -98,20 +102,22 @@ export default function Account() {
     })();
   }, [t]);
 
-  // load billing
-  useEffect(() => {
-    (async () => {
-      setBillingLoading(true);
-      try {
-        const res = await api.get("/billing/me/");
-        setCurrentPlan(res.data.plan || "free");
-      } catch (err) {
-        // if it fails we just stay on free
-      } finally {
-        setBillingLoading(false);
-      }
-    })();
-  }, []);
+    // load billing
+    useEffect(() => {
+      (async () => {
+        setBillingLoading(true);
+        try {
+          const res = await api.get("/billing/me/");
+          setCurrentPlan(res.data.plan || "free");
+          setWillCancel(!!res.data.will_cancel_at_period_end);
+          setPlanEndDate(res.data.current_period_end || null);
+        } catch (err) {
+          // if it fails we just stay on free
+        } finally {
+          setBillingLoading(false);
+        }
+      })();
+    }, []);
 
   function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (!e.target.files || !e.target.files[0]) return;
@@ -185,23 +191,21 @@ export default function Account() {
     }
   }
 
-  // start stripe checkout
-  async function handleUpgrade() {
-    setCheckoutLoading(true);
-    try {
-      const res = await api.post("/billing/create-checkout/", {
-        plan: "pro",
-        domain: window.location.origin,
-      });
-      if (res.data.checkout_url) {
-        window.location.href = res.data.checkout_url;
+      async function handleCancelSubscription() {
+        setCancelLoading(true);
+        try {
+          await api.post("/billing/cancel/");
+          // We keep the user on Pro until period end, but mark it as “will not renew”
+          setWillCancel(true);
+          setShowCancelConfirm(false);
+        } catch (err) {
+          console.error(err);
+          alert(t("account_billing_cancel_error"));
+        } finally {
+          setCancelLoading(false);
+        }
       }
-    } catch (err) {
-      alert(t("account_billing_checkout_error"));
-    } finally {
-      setCheckoutLoading(false);
-    }
-  }
+
 
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
@@ -354,39 +358,103 @@ export default function Account() {
           <p>{t("account_billing_loading")}</p>
         ) : (
           <>
-            <p className="text-sm">
-              {t("account_billing_current_plan_label")}{" "}
-              <strong>
-                {currentPlan === "pro"
-                  ? t("account_billing_plan_pro_label")
-                  : t("account_billing_plan_free_label")}
-              </strong>
-            </p>
+            {(() => {
+              const isPro = currentPlan && currentPlan !== "free";
 
-            {currentPlan === "free" ? (
-              <div className="flex flex-col gap-2 mt-2">
-                <button
-                  onClick={handleUpgrade}
-                  disabled={checkoutLoading}
-                  className="bg-gradient-to-r from-purple to-pink text-white px-4 py-2 rounded-xl shadow-md shadow-purple/25 text-sm font-semibold hover:shadow-purple/40 transition-all"
-                >
-                  {checkoutLoading
-                    ? t("account_billing_upgrade_redirecting")
-                    : t("account_billing_upgrade_button")}
-                </button>
+              return (
+                <>
+                  <p className="text-sm">
+                    {t("account_billing_current_plan_label")}{" "}
+                    <strong>
+                      {isPro
+                        ? t("account_billing_plan_pro_label")
+                        : t("account_billing_plan_free_label")}
+                    </strong>
+                  </p>
 
-                <a
-                  href="/pricing"
-                  className="text-purple text-xs underline hover:text-pink transition-colors"
-                >
-                  {t("account_billing_view_pricing_link")}
-                </a>
-              </div>
-            ) : (
-              <p style={{ color: "green" }} className="mt-2">
-                {t("account_billing_on_pro_label")}
-              </p>
-            )}
+                  {!isPro ? (
+                    <div className="flex flex-col gap-2 mt-2">
+                      <button
+                        onClick={() => (window.location.href = "/pricing")}
+                        className="bg-gradient-to-r from-purple to-pink text-white px-4 py-2 rounded-xl shadow-md shadow-purple/25 text-sm font-semibold hover:shadow-purple/40 transition-all"
+                      >
+                        {t("account_billing_upgrade_button")}
+                      </button>
+
+                      <a
+                        href="/pricing"
+                        className="text-purple text-xs underline hover:text-pink transition-colors"
+                      >
+                        {t("account_billing_view_pricing_link")}
+                      </a>
+                    </div>
+                  ) : (
+                    <>
+                      <p
+                        style={{ color: "green" }}
+                        className="mt-2 text-sm"
+                      >
+                        {willCancel
+                          ? planEndDate
+                            ? `${t(
+                                "account_billing_on_pro_cancel_scheduled"
+                              )} ${new Date(
+                                planEndDate
+                              ).toLocaleDateString()}`
+                            : t(
+                                "account_billing_on_pro_cancel_scheduled_no_date"
+                              )
+                          : t("account_billing_on_pro_label")}
+                      </p>
+
+                      {/* Cancel subscription UI */}
+                      {!willCancel && (
+                        <div className="mt-3">
+                          <button
+                            type="button"
+                            onClick={() => setShowCancelConfirm(true)}
+                            className="bg-white border border-red-200 text-red-600 px-4 py-2 rounded-xl text-xs font-semibold hover:bg-red-50 transition-all"
+                          >
+                            {t("account_billing_cancel_button")}
+                          </button>
+
+                          {showCancelConfirm && (
+                            <div className="mt-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-900">
+                              <p className="mb-2">
+                                {t("account_billing_cancel_confirm")}
+                              </p>
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={handleCancelSubscription}
+                                  disabled={cancelLoading}
+                                  className="px-3 py-1.5 rounded-xl bg-red-600 text-white text-xs font-semibold hover:bg-red-700 disabled:opacity-60"
+                                >
+                                  {cancelLoading
+                                    ? t("account_billing_cancel_loading")
+                                    : t(
+                                        "account_billing_cancel_confirm_button"
+                                      )}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowCancelConfirm(false)}
+                                  className="px-3 py-1.5 rounded-xl border border-red-200 bg-white text-xs font-semibold text-red-700 hover:bg-red-50"
+                                >
+                                  {t(
+                                    "account_billing_cancel_keep_pro_button"
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              );
+            })()}
           </>
         )}
 
@@ -400,6 +468,8 @@ export default function Account() {
           {t("account_billing_stripe_note")}
         </p>
       </section>
+
+
 
       {/* Creator preferences */}
       <section style={sectionStyle}>

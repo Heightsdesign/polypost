@@ -333,6 +333,7 @@ class Subscription(models.Model):
     stripe_subscription_id = models.CharField(max_length=200, blank=True, null=True)
     start_date = models.DateTimeField(default=dj_timezone.now)
     end_date = models.DateTimeField(blank=True, null=True)
+    will_cancel_at_period_end = models.BooleanField(default=False)
 
     def is_active(self):
         return self.end_date is None or self.end_date > dj_timezone.now()
