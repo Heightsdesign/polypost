@@ -270,7 +270,7 @@ const SchedulerWidget: React.FC<SchedulerWidgetProps> = ({
   return (
     <section
       id="dashboard-scheduler"
-      className="rounded-3xl bg-white/90 backdrop-blur-xl border border-white/40 shadow-md p-4 md:p-5"
+      className="rounded-3xl bg-white/60 backdrop-blur-xl border border-white/40 shadow-md p-3 md:p-4"
     >
       <div className="flex items-center justify-between mb-3">
         <div>
@@ -281,21 +281,40 @@ const SchedulerWidget: React.FC<SchedulerWidgetProps> = ({
             {t("scheduler_subtitle")}
           </p>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          {/* PREV */}
           <button
             type="button"
             onClick={goPrevMonth}
-            className="px-2 py-1 rounded-lg border border-purple/20 text-xs text-purple hover:bg-purple/5"
+            className="
+              px-2 py-1 rounded-lg text-xs font-semibold
+              text-dark/70 
+              bg-transparent 
+              border border-transparent
+              transition-all
+              hover:bg-purple hover:text-white
+            "
           >
             ←
           </button>
+
+          {/* MONTH LABEL */}
           <span className="text-xs font-semibold text-dark">
             {monthLabel}
           </span>
+
+          {/* NEXT */}
           <button
             type="button"
             onClick={goNextMonth}
-            className="px-2 py-1 rounded-lg border border-purple/20 text-xs text-purple hover:bg-purple/5"
+            className="
+              px-2 py-1 rounded-lg text-xs font-semibold
+              text-dark/70 
+              bg-transparent 
+              border border-transparent
+              transition-all
+              hover:bg-purple hover:text-white
+            "
           >
             →
           </button>
@@ -327,13 +346,13 @@ const SchedulerWidget: React.FC<SchedulerWidgetProps> = ({
               key={key}
               type="button"
               onClick={() => handleDayClick(day)}
-              className={`aspect-square rounded-xl border text-[11px] flex flex-col items-center justify-center gap-1 transition-all ${
+              className={`h-9 md:h-11 w-full rounded-xl border text-[10px] flex flex-col items-center justify-center gap-1 transition-all ${
                 hasReminders
                   ? "border-purple bg-purple/5"
                   : "border-purple/10 bg-white"
               } hover:border-purple/60 hover:bg-purple/5`}
             >
-              <span className="text-xs font-semibold text-dark">
+              <span className="text-[11px] font-semibold text-dark">
                 {day.getDate()}
               </span>
               {hasReminders && (
@@ -342,6 +361,7 @@ const SchedulerWidget: React.FC<SchedulerWidgetProps> = ({
                 </span>
               )}
             </button>
+
           );
         })}
       </div>

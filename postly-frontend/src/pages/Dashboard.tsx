@@ -3,19 +3,9 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../api";
 import ReviewsSection from "../components/ReviewSection";
+import SoftBackground from "../components/SoftBackground";
 import { useLanguage } from "../i18n/LanguageContext";
 
-// blobs & bg
-import BlobRed from "../assets/blobs/blob-1.png";
-import BlobPurple from "../assets/blobs/blob-2.png";
-import BlobYellow from "../assets/blobs/blob-3.png";
-import BlobRedSmall from "../assets/blobs/red-dot.png";
-import BlobYellowSmall from "../assets/blobs/yellow-dot.png";
-import BlobPurpleLarge from "../assets/blobs/blob-6.png";
-import BlobOrange from "../assets/blobs/blob-3.png";
-import BlobGreen from "../assets/blobs/blob-4.png";
-import BlobPurpleDot from "../assets/blobs/blob-6.png";
-import BlobRedLarge from "../assets/blobs/blob-5.png";
 import SchedulerWidget, { type Reminder } from "../components/SchedulerWidget";
 
 // simple modal
@@ -36,7 +26,7 @@ function Modal({
       <div
         className="
           relative w-full max-w-xl max-h-[85vh]
-          rounded-3xl bg-white/95 p-5 md:p-6
+          rounded-3xl bg-white/60 p-5 md:p-6
           shadow-2xl border border-purple/10
           flex flex-col
         "
@@ -294,69 +284,8 @@ export default function Dashboard() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-offwhite">
-      {/* soft diagonal lens gradient */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          zIndex: 0,
-          backgroundImage: `
-            radial-gradient(120% 200% at 0% 0%, rgba(111, 161, 255, 0.14), transparent 60%),
-            radial-gradient(120% 200% at 100% 100%, rgba(139, 80, 235, 0.18), transparent 60%)
-          `,
-        }}
-      />
-
-      {/* blobs (unchanged) */}
-      <img
-        src={BlobGreen}
-        alt=""
-        className="pointer-events-none absolute -right-48 bottom-[-140px] w-[420px] opacity-80"
-      />
-      <img
-        src={BlobYellowSmall}
-        alt=""
-        className="pointer-events-none absolute left-52 top-6 w-28 opacity-40 blob-float-slow"
-      />
-      <img
-        src={BlobRedSmall}
-        alt=""
-        className="pointer-events-none absolute left-[-40px] bottom-[-40px] w-40 opacity-80"
-      />
-      <img
-        src={BlobPurpleDot}
-        alt=""
-        className="pointer-events-none absolute left-[-40px] top-64 w-40 opacity-80 rotate-[10deg]"
-      />
-      <img
-        src={BlobOrange}
-        alt=""
-        className="pointer-events-none absolute left-[-220px] top-[-160px] w-[420px] opacity-80 rotate-[18deg]"
-      />
-      <img
-        src={BlobRedLarge}
-        alt=""
-        className="pointer-events-none absolute right-40 bottom-[-120px] w-80 opacity-80 rotate-[12deg]"
-      />
-      <img
-        src={BlobPurpleLarge}
-        alt=""
-        className="pointer-events-none absolute right-[-260px] top-[-200px] w-[520px] opacity-70 rotate-[18deg]"
-      />
-      <img
-        src={BlobRed}
-        alt=""
-        className="pointer-events-none absolute right-[-200px] top-[220px] w-[340px] opacity-60 rotate-[10deg]"
-      />
-      <img
-        src={BlobPurple}
-        alt=""
-        className="pointer-events-none absolute left-[-260px] bottom-[-260px] w-[520px] opacity-70 rotate-[18deg]"
-      />
-      <img
-        src={BlobYellow}
-        alt=""
-        className="pointer-events-none absolute left-[-220px] top-[220px] w-[340px] opacity-70 rotate-[18deg]"
-      />
+    {/* Reusable soft background */}
+    <SoftBackground opacity={1} />
 
       <div className="relative z-10 px-4 py-6 md:px-6 md:py-8">
         {/* header */}
@@ -390,7 +319,7 @@ export default function Dashboard() {
           {/* left column */}
           <div className="space-y-5">
             {/* quick actions */}
-            <section className="rounded-3xl bg-white/80 backdrop-blur-xl border border-white/40 shadow-md p-5 md:p-6">
+            <section className="rounded-3xl bg-white/60 backdrop-blur-xl border border-white/40 shadow-md p-5 md:p-6">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5">
                 <div>
                   <h2 className="text-sm md:text-base font-semibold text-dark mb-1">
