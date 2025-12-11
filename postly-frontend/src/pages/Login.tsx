@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import api, { setAuthToken } from "../api";
 import { useLanguage } from "../i18n/LanguageContext";
+import SoftBackground from "../components/SoftBackground";
 
 export default function Login() {
   const { t } = useLanguage();
@@ -23,49 +24,68 @@ export default function Login() {
   }
 
   return (
-    <div style={{ maxWidth: 380, margin: "40px auto", textAlign: "center" }}>
-      <h1>{t("login_title")}</h1>
+    <div className="relative min-h-screen bg-offwhite overflow-hidden">
+      {/* shared soft background */}
+      <SoftBackground opacity={0.5} />
 
-      <form
-        onSubmit={handleSubmit}
-        style={{ display: "flex", flexDirection: "column", gap: 12 }}
-      >
-        <input
-          placeholder={t("login_username_placeholder")}
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          style={{ padding: 10, fontSize: 16 }}
-        />
-        <input
-          placeholder={t("login_password_placeholder")}
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ padding: 10, fontSize: 16 }}
-        />
+      {/* centered card */}
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-4">
+        <div className="w-full max-w-sm rounded-3xl bg-white/95 border border-white/50 shadow-xl px-6 py-7 md:px-7 md:py-8 text-center">
+          <h1 className="text-2xl font-semibold text-dark mb-2">
+            {t("login_title")}
+          </h1>
 
-        <button type="submit" style={{ padding: 12, marginTop: 10 }}>
-          {t("login_button")}
-        </button>
-      </form>
+          <form
+            onSubmit={handleSubmit}
+            className="mt-4 flex flex-col gap-3 text-left"
+          >
+            <input
+              placeholder={t("login_username_placeholder")}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2.5 text-sm text-dark outline-none focus:border-purple focus:ring-1 focus:ring-purple/40"
+            />
+            <input
+              placeholder={t("login_password_placeholder")}
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-2xl border border-purple/15 bg-purple/5 px-3 py-2.5 text-sm text-dark outline-none focus:border-purple focus:ring-1 focus:ring-purple/40"
+            />
 
-      {error && (
-        <p style={{ color: "red", marginTop: 10 }}>
-          {error}
-        </p>
-      )}
+            <button
+              type="submit"
+              className="mt-2 w-full rounded-2xl bg-gradient-to-r from-purple to-pink text-white text-sm font-semibold py-2.5 shadow-md shadow-purple/30 hover:shadow-purple/40 hover:-translate-y-[1px] active:translate-y-0 transition-all"
+            >
+              {t("login_button")}
+            </button>
+          </form>
 
-      <div style={{ marginTop: 20 }}>
-        <Link to="/forgot-password" style={{ fontSize: 14, color: "#007bff" }}>
-          {t("login_forgot_password")}
-        </Link>
-      </div>
+          {error && (
+            <p className="mt-3 text-sm text-red-600">
+              {error}
+            </p>
+          )}
 
-      <div style={{ marginTop: 10 }}>
-        <span style={{ fontSize: 14 }}>{t("login_no_account")} </span>
-        <Link to="/register" style={{ fontSize: 14, color: "#007bff" }}>
-          {t("login_register_link")}
-        </Link>
+          <div className="mt-4">
+            <Link
+              to="/forgot-password"
+              className="text-xs md:text-sm text-purple hover:text-pink underline"
+            >
+              {t("login_forgot_password")}
+            </Link>
+          </div>
+
+          <div className="mt-3 text-xs md:text-sm text-dark/70">
+            <span>{t("login_no_account")} </span>
+            <Link
+              to="/register"
+              className="text-purple hover:text-pink underline"
+            >
+              {t("login_register_link")}
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   );

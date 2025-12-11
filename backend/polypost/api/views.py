@@ -462,11 +462,14 @@ class GenerateIdeasView(views.APIView):
             f"{t.platform}: {t.title}" for t in latest_trends if t.title
         ]
 
-        # ---------------------------------------------------------------------
+                # ---------------------------------------------------------------------
         # 4. Build localized AI prompt
         # ---------------------------------------------------------------------
+        today_str = today.isoformat()
+
         lines = [
             "You are a social media content strategist.",
+            f"Today's date is {today_str}. Always take the current season and major holidays around this date into account.",
             f"Platform to create for: {platform}.",
             "",
             f"Creator vibe: {vibe}",
@@ -479,6 +482,7 @@ class GenerateIdeasView(views.APIView):
         if location:
             lines.append(f"Location context: {location}")
 
+        # --- Trends block ---
         lines.append("")
         lines.append("We have some FRESH trends from our database. PRIORITIZE these:")
         if trending_labels:
@@ -486,17 +490,25 @@ class GenerateIdeasView(views.APIView):
         else:
             lines.append("- (no DB trends available, use general social media inspiration)")
 
+        # --- Seasonal / recurring hooks ---
         lines.append("")
-        lines.append("Seasonal / recurring hooks (use only if relevant):")
+        lines.append(
+            "Seasonal / recurring hooks (especially important if relevant to today's date, "
+            "e.g. Christmas, New Year, Valentine's, Halloween, etc.):"
+        )
         for h in (seasonal + floating + stub_trends):
             lines.append(f"- {h}")
 
+        # --- Instructions ---
         lines.append("")
         lines.append(
             "INSTRUCTIONS:\n"
             "- Generate EXACTLY 5 ideas.\n"
-            "- At least 2 ideas MUST come from the latest DB trends above.\n"
-            "- Avoid repetitive or generic holiday content unless trends are empty.\n"
+            "- At least 2 ideas MUST be primarily inspired by the latest DB trends listed above.\n"
+            "- Also include AT LEAST 1 idea that is clearly based on a seasonal or recurring hook "
+            "relevant to today's date (e.g. Christmas, New Year, Valentine's, Halloween, etc.) "
+            "when such hooks are listed.\n"
+            "- Seasonal ideas should NOT be generic clichés: make them specific to the creator's niche and audience.\n"
             "- Keep ideas aligned with the creator's tone and niche.\n"
             "- If location is provided, use culturally relevant examples or slang.\n"
             "- Return ONLY JSON (array of 5 objects). No markdown, no commentary.\n"
@@ -631,7 +643,7 @@ class SchedulerSuggestionsView(views.APIView):
         profile = CreatorProfile.objects.filter(user=user).first()
 
         platform = request.GET.get("platform")  # e.g. "instagram"
-        days = int(request.GET.get("days", 3))
+        days = int(request.GET.get("days", 15))
 
         # user timezone (for nice display)
         user_tz_name = getattr(profile, "timezone", None) or "UTC"
@@ -1237,25 +1249,27 @@ class AIPostingPlanView(views.APIView):
 
         platform = request.data.get("platform", "instagram")
 
-        # We accept `days` for future tuning but don't use it yet.
+        # How many days ahead to plan (default: 14)
         try:
-            _days = int(request.data.get("days", 7))
+            days = int(request.data.get("days", 14))
         except (TypeError, ValueError):
-            _days = 7  # noqa
+            days = 14
 
         # Let the helper decide posts_per_week (based on profile/goal)
         plan_slots = generate_ai_posting_plan(
             profile=profile,
             platform=platform,
             posts_per_week=None,
+            days_ahead=days,
         )
 
         if not plan_slots:
-            # fallback safety: 4 posts/week
+            # fallback safety: 4 posts/week over the same window
             plan_slots = generate_ai_posting_plan(
                 profile=profile,
                 platform=platform,
                 posts_per_week=4,
+                days_ahead=days,
             )
 
         # user timezone (for interpreting naive datetimes)
@@ -1265,7 +1279,7 @@ class AIPostingPlanView(views.APIView):
         except Exception:
             user_tz = zoneinfo.ZoneInfo("UTC")
 
-        now_utc = dt_timezone.now()
+        now_utc = dj_timezone.now()
         valid_slots = []
 
         # 1️⃣ First pass: normalize datetimes + filter out past ones

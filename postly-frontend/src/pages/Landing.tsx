@@ -283,11 +283,16 @@ export default function Landing() {
                 <div className="mt-8 flex flex-col sm:flex-row gap-3 sm:items-center">
                   <Link
                     to="/login"
-                    className="inline-flex items-center justify-center px-6 py-3 rounded-2xl text-sm font-semibold text-white bg-gradient-to-r from-purple to-pink shadow-lg shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
+                    className="inline-flex items-center justify-center px-6 py-3 rounded-2xl text-sm font-semibold 
+                              text-white hover:text-white 
+                              bg-gradient-to-r from-purple to-pink 
+                              shadow-lg shadow-purple/30 
+                              hover:shadow-purple/40 
+                              hover:translate-y-[-1px] active:translate-y-0 
+                              transition-all"
                   >
                     {t("landing_login_cta")}
                   </Link>
-
                   <Link
                     to="/register"
                     className="inline-flex items-center justify-center px-6 py-3 rounded-2xl text-sm font-semibold border border-purple/30 text-purple bg-white/90 backdrop-blur hover:bg-white shadow-md hover:shadow-lg transition-all"

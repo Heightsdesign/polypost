@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { ReactNode, ChangeEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Logo from "../assets/logo/logo-font-black-wide.png";
+import Emblem from "../assets/logo/logo-emblem-color-wide.png";
 import api, { setAuthToken } from "../api";
 import { useLanguage } from "../i18n/LanguageContext";
 import type { SupportedLang } from "../i18n/translations";
@@ -160,9 +161,14 @@ export default function Navbar() {
   return (
     <nav className="sticky top-0 z-30 border-b border-purple/10 bg-offwhite/80 backdrop-blur">
       <div className="max-w-6xl mx-auto px-4 md:px-6 py-3 flex items-center">
-        {/* LEFT: logo */}
+        {/* LEFT: logo + emblem */}
         <div className="flex-1 flex items-center">
           <Link to="/" className="flex items-center gap-2">
+            <img
+              src={Emblem}
+              alt={t("navbar_logo_alt")}
+              className="h-7 w-auto md:h-8"
+            />
             <img
               src={Logo}
               alt={t("navbar_logo_alt")}
@@ -279,13 +285,19 @@ export default function Navbar() {
             <>
               <Link
                 to="/login"
-                className="text-xs md:text-sm font-semibold text-dark/80 hover:text-purple transition-colors"
+                className="text-xs md:text-sm font-semibold text-dark/80 transition-colors"
               >
                 {t("navbar_login")}
               </Link>
               <Link
                 to="/register"
-                className="hidden sm:inline-flex items-center justify-center px-4 py-2 rounded-2xl text-xs md:text-sm font-semibold text-white bg-gradient-to-r from-purple to-pink shadow-md shadow-purple/30 hover:shadow-purple/40 hover:translate-y-[-1px] active:translate-y-0 transition-all"
+                className="hidden sm:inline-flex items-center justify-center px-4 py-2 rounded-2xl text-xs md:text-sm font-semibold 
+                          text-white hover:text-white 
+                          bg-gradient-to-r from-purple to-pink 
+                          shadow-md shadow-purple/30 
+                          hover:shadow-purple/40 
+                          hover:translate-y-[-1px] active:translate-y-0 
+                          transition-all"
               >
                 {t("navbar_get_started")}
               </Link>
@@ -298,7 +310,10 @@ export default function Navbar() {
                   setMenuOpen((o) => !o);
                   setNotifOpen(false);
                 }}
-                className="flex items-center gap-2 rounded-2xl border border-purple/15 bg-white/90 px-3 py-2 text-xs md:text-sm font-semibold text-dark shadow-sm hover:border-purple/40 hover:shadow-md transition-all"
+                className="group flex items-center gap-2 rounded-2xl border border-purple/15 
+                          bg-white/90 px-3 py-2 text-xs md:text-sm font-semibold text-dark 
+                          shadow-sm hover:border-purple/40 hover:bg-purple/90 hover:text-white hover:shadow-md 
+                          transition-all"
               >
                 {/* Avatar / initial */}
                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-purple/15 text-[0.8rem] font-bold text-purple overflow-hidden">
@@ -314,14 +329,20 @@ export default function Navbar() {
                 </div>
 
                 <div className="flex flex-col items-start leading-tight">
-                  <span className="text-xs md:text-sm">{displayName}</span>
+                  <span className="text-xs md:text-sm group-hover:text-white transition-colors">
+                    {displayName}
+                  </span>
+
                   {user?.email && (
-                    <span className="hidden md:block text-[0.7rem] text-dark/55 max-w-[180px] truncate">
+                    <span className="hidden md:block text-[0.7rem] text-dark/55 group-hover:text-white/90 max-w-[180px] truncate transition-colors">
                       {user.email}
                     </span>
                   )}
                 </div>
-                <span className="text-[0.7rem] text-dark/50">▾</span>
+
+                <span className="text-[0.7rem] text-dark/50 group-hover:text-white/80 transition-colors">
+                  ▾
+                </span>
               </button>
 
               {menuOpen && (
@@ -357,7 +378,9 @@ export default function Navbar() {
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="w-full text-left px-3 py-2 text-[0.78rem] md:text-xs text-dark/80 hover:bg-purple/5"
+                    className="w-full text-left px-3 py-2 text-[0.78rem] md:text-xs 
+                              text-white hover:text-dark/80 hover:bg-purple/5 
+                              transition-colors rounded-xl"
                   >
                     {t("navbar_logout")}
                   </button>

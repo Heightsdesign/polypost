@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api";
 import { useLanguage } from "../i18n/LanguageContext";
+import SoftBackground from "../components/SoftBackground";
+
 
 type DraftType = "idea" | "media";
 
@@ -346,7 +348,11 @@ export default function Gallery() {
   // ---------- UI ----------
 
   return (
-    <div className="relative min-h-screen bg-offwhite">
+    <div className="relative min-h-screen bg-offwhite overflow-hidden">
+      {/* shared soft background */}
+      <SoftBackground opacity={0.45} />
+
+      {/* page content */}
       <div className="relative z-10 px-4 py-6 md:px-6 md:py-8">
         {/* Header */}
         <header className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">

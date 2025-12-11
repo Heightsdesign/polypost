@@ -134,64 +134,136 @@ def get_trending_movies_from_tmdb():
         data = resp.json()
         return [m["title"] for m in data.get("results", [])][:5]
     return []
-
-
 def get_seasonal_hooks(today: date | None = None):
-    """Yearly recurring events, based only on month/day."""
+    """Globally-aware seasonal events based on month/day (static)."""
     if today is None:
         today = date.today()
     month = today.month
 
     hooks = []
 
-    # Winter
+    # ---- GLOBAL SEASONAL CONTENT ----
+    # DECEMBER
     if month == 12:
         hooks += [
-            "Christmas / holiday content",
-            "Year-in-review carousel",
-            "New Year resolutions teaser",
+            "Christmas / holiday aesthetic (gift ideas, wishlists, cozy vibes)",
+            "Year-in-review carousel / recap",
+            "Holiday travel tips or scenes",
+            "New Year resolutions teaser / goal-setting content",
+            "Winter fashion / cozy outfits",
         ]
-    # January
+
+    # JANUARY
     if month == 1:
         hooks += [
-            "New year, new goals",
-            "Behind-the-scenes of upcoming content",
+            "New Year, new goals (routines, resets, planners)",
+            "Vision board creation",
+            "Winter wellness / skincare",
+            "Motivation restart after holidays",
         ]
-    # February
+
+    # FEBRUARY
     if month == 2:
         hooks += [
-            "Valentine's Day content / self-love",
-            "Galentine's ideas",
+            "Valentine's Day (couples, self-love, friendship)",
+            "Galentine’s Day ideas",
+            "Carnival season content (Brazil, Trinidad, Venice)",
+            "Lunar New Year celebration content",
         ]
-    # October
+
+    # MARCH
+    if month == 3:
+        hooks += [
+            "Spring aesthetic reset",
+            "Women's History Month empowerment content",
+            "St. Patrick’s Day outfits / green aesthetic",
+        ]
+
+    # APRIL
+    if month == 4:
+        hooks += [
+            "Spring cleaning / declutter reset",
+            "Easter creativity / pastel aesthetic",
+            "Ramadan & Eid content (family, food, traditions)",
+            "Festival season warm-up (Coachella vibes)",
+        ]
+
+    # MAY
+    if month == 5:
+        hooks += [
+            "Cinco de Mayo cultural celebration content",
+            "Mother’s Day appreciation ideas",
+            "Graduation content",
+            "Spring-to-summer outfits",
+        ]
+
+    # JUNE
+    if month == 6:
+        hooks += [
+            "Pride Month celebration",
+            "Summer travel teaser",
+            "End-of-school / start-of-summer content",
+            "Father’s Day appreciation ideas",
+        ]
+
+    # JULY
+    if month == 7:
+        hooks += [
+            "Summer vacation content",
+            "Beach aesthetic / tropical outfits",
+            "Mid-year productivity check-in",
+            "Fourth of July aesthetic (optional, if relevant)",
+        ]
+
+    # AUGUST
+    if month == 8:
+        hooks += [
+            "Back-to-school / back-to-work reset",
+            "Summer fading aesthetic",
+            "Late-summer fashion",
+        ]
+
+    # SEPTEMBER
+    if month == 9:
+        hooks += [
+            "Fall aesthetic (pumpkin, cozy colors)",
+            "Study routine / productivity",
+            "Fashion week inspiration",
+        ]
+
+    # OCTOBER
     if month == 10:
         hooks += [
             "Halloween costumes / spooky aesthetic",
-            "Fall cozy vibes",
+            "Autumn cozy vibes",
+            "Oktoberfest content",
         ]
-    # November
+
+    # NOVEMBER
     if month == 11:
         hooks += [
             "Thanksgiving gratitude post",
-            "Black Friday / promo teaser",
+            "Black Friday / Cyber Monday teaser",
+            "Diwali celebration content",
+            "Movember men’s health awareness",
         ]
 
-    # Always-useful evergreen hooks
+    # ---- ALWAYS-USEFUL EVERGREEN HOOKS ----
     hooks += [
         "Ask-your-audience Q&A",
-        "Behind-the-scenes / process post",
-        "Before/after or glow-up post",
+        "Behind-the-scenes process content",
+        "Before/after transformation or glow-up",
+        "Day-in-the-life routine",
         "Poll: what content do you want next?",
+        "Mini-tutorial or 'things I wish I knew earlier'",
     ]
 
     return hooks
 
-
 def get_floating_event_hooks(today: date | None = None):
     """
-    Events that happen every year but not on the same date.
-    For now it's a static approximation; later you can
-    generate these from a small JSON or an external API.
+    Global events that occur yearly but on variable dates.
+    Static approximations for now.
     """
     if today is None:
         today = date.today()
@@ -199,23 +271,51 @@ def get_floating_event_hooks(today: date | None = None):
 
     hooks = []
 
-    # Super Bowl: usually early February
-    if month == 2:
-        hooks.append("Super Bowl themed content (outfits, snacks, predictions, reactions)")
+    # ---- GLOBAL FLOATING EVENTS ----
 
-    # Champions League Final: usually late May / early June
+    # Super Bowl (early February)
+    if month == 2:
+        hooks.append("Super Bowl reactions, predictions, snacks, or themed outfits")
+
+    # Oscars / Awards season (late Feb – March)
+    if month in (2, 3):
+        hooks.append("Awards show content: red carpet reactions, recreate-the-outfit challenge")
+
+    # Carnival (Feb–March)
+    if month in (2, 3):
+        hooks.append("Carnival-inspired looks or parade street-style content")
+
+    # Eurovision (May)
+    if month == 5:
+        hooks.append("Eurovision reactions, outfits, or parody content")
+
+    # Champions League Final (May/June)
     if month in (5, 6):
         hooks.append("Champions League final reactions / football-themed content")
 
-    # Oscars / awards season: late Feb / March
-    if month in (2, 3):
-        hooks.append("Award show / red carpet reaction or 'rate this outfit' content")
+    # NBA Finals (June)
+    if month == 6:
+        hooks.append("NBA finals reactions, predictions, or fit checks")
 
-    # Met Gala: early May
-    if month == 5:
-        hooks.append("Met Gala inspired looks / recreate the outfit challenge")
+    # Fashion Week circuit (Feb + Sep)
+    if month in (2, 9):
+        hooks.append("Fashion Week inspired outfits / streetwear analysis")
+
+    # Ramadan & Eid (varies)
+    # Approx mapping (moves ~10 days earlier each year)
+    if month in (3, 4, 5):
+        hooks.append("Ramadan & Eid routines, food, traditions, and spiritual content")
+
+    # Coachella (April)
+    if month == 4:
+        hooks.append("Coachella festival aesthetic / outfits / expectations vs reality")
+
+    # Back-to-school (Aug–Sep)
+    if month in (8, 9):
+        hooks.append("Back-to-school aesthetic, productivity hacks, study glow-up")
 
     return hooks
+
 
 
 def get_trending_stub_hooks():

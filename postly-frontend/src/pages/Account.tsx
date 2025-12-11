@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import api from "../api";
 import { useLanguage } from "../i18n/LanguageContext";
+import SoftBackground from "../components/SoftBackground";
 
 const ALL_PLATFORMS = [
   { value: "instagram", label: "Instagram" },
@@ -57,6 +58,33 @@ export default function Account() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [preferredPlatforms, setPreferredPlatforms] = useState<string[]>([]);
+
+  
+const sectionStyle: React.CSSProperties = {
+  background: "#fff",
+  border: "1px solid #eee",
+  borderRadius: 12,
+  padding: "1rem 1.25rem",
+  marginTop: "1.25rem",
+};
+
+const fieldStyle: React.CSSProperties = {
+  display: "flex",
+  gap: "1rem",
+  alignItems: "center",
+  justifyContent: "space-between",
+  marginBottom: "0.75rem",
+};
+
+const connectCard: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  border: "1px solid #eee",
+  borderRadius: 8,
+  padding: "0.75rem 1rem",
+  marginTop: "0.75rem",
+};
 
   // load profile
   useEffect(() => {
@@ -249,7 +277,12 @@ export default function Account() {
   }
 
   return (
-    <div style={{ maxWidth: 700, margin: "0 auto" }}>
+  <div className="relative min-h-screen bg-offwhite px-4 md:px-6 py-8 overflow-hidden">
+    {/* Shared soft background */}
+    <SoftBackground opacity={0.45} />
+
+    {/* Actual page content */}
+    <div className="relative z-10" style={{ maxWidth: 700, margin: "0 auto" }}>
       <h1>{t("account_title")}</h1>
       <p>{t("account_subtitle")}</p>
 
@@ -438,7 +471,9 @@ export default function Account() {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => setShowCancelConfirm(false)}
+                                  onClick={() =>
+                                    setShowCancelConfirm(false)
+                                  }
                                   className="px-3 py-1.5 rounded-xl border border-red-200 bg-white text-xs font-semibold text-red-700 hover:bg-red-50"
                                 >
                                   {t(
@@ -469,15 +504,15 @@ export default function Account() {
         </p>
       </section>
 
-
-
       {/* Creator preferences */}
       <section style={sectionStyle}>
         <h2>{t("account_prefs_title")}</h2>
         <p style={{ color: "#666" }}>{t("account_prefs_subtitle")}</p>
         {loading && <p>{t("account_prefs_loading")}</p>}
         {error && <p style={{ color: "red" }}>{error}</p>}
-        {success && <p style={{ color: "green" }}>{t("account_prefs_saved")}</p>}
+        {success && (
+          <p style={{ color: "green" }}>{t("account_prefs_saved")}</p>
+        )}
 
         {!loading && (
           <form onSubmit={handleSavePrefs}>
@@ -509,7 +544,9 @@ export default function Account() {
               <label>{t("account_prefs_target_label")}</label>
               <input
                 value={targetAudience}
-                onChange={(e) => setTargetAudience(e.target.value)}
+                onChange={(e) =>
+                  setTargetAudience(e.target.value)
+                }
                 placeholder={t("account_prefs_target_placeholder")}
               />
             </div>
@@ -732,37 +769,16 @@ export default function Account() {
 
         <button
           onClick={handleLogout}
-          style={{ background: "#eee", padding: "0.5rem 0.9rem", borderRadius: 8 }}
+          style={{
+            background: "#eee",
+            padding: "0.5rem 0.9rem",
+            borderRadius: 8,
+          }}
         >
           {t("account_logout_button")}
         </button>
       </section>
     </div>
-  );
-}
+  </div>
+)};
 
-const sectionStyle: React.CSSProperties = {
-  background: "#fff",
-  border: "1px solid #eee",
-  borderRadius: 12,
-  padding: "1rem 1.25rem",
-  marginTop: "1.25rem",
-};
-
-const fieldStyle: React.CSSProperties = {
-  display: "flex",
-  gap: "1rem",
-  alignItems: "center",
-  justifyContent: "space-between",
-  marginBottom: "0.75rem",
-};
-
-const connectCard: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  border: "1px solid #eee",
-  borderRadius: 8,
-  padding: "0.75rem 1rem",
-  marginTop: "0.75rem",
-};

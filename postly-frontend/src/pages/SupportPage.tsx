@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { submitSupportTicket } from "../api";
 import { useLanguage } from "../i18n/LanguageContext";
+import SoftBackground from "../components/SoftBackground";
 
 type Category = "bug" | "billing" | "idea" | "other";
 
@@ -46,19 +47,9 @@ const SupportPage: React.FC = () => {
   }));
 
   return (
-    <div className="relative overflow-hidden min-h-screen bg-offwhite">
-      {/* soft background, same vibe as register */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          zIndex: 0,
-          backgroundImage: `
-            radial-gradient(120% 200% at 0% 0%, rgba(255, 111, 145, 0.12), transparent 60%),
-            radial-gradient(120% 200% at 100% 100%, rgba(88, 80, 235, 0.16), transparent 60%)
-          `,
-          opacity: 0.6,
-        }}
-      />
+     <div className="relative min-h-screen bg-offwhite overflow-hidden">
+      {/* shared soft background */}
+      <SoftBackground opacity={0.45} />
 
       <div className="relative z-10 max-w-4xl mx-auto px-4 md:px-8 py-10 md:py-16">
         <header className="mb-8">

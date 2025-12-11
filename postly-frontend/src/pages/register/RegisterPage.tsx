@@ -6,6 +6,7 @@ import StepTone from "./RegisterSteps/StepTone";
 import StepExtras from "./RegisterSteps/StepExtras";
 import api from "../../api";
 import { useLanguage } from "../../i18n/LanguageContext";
+import SoftBackground from "../../components/SoftBackground";
 
 const RegisterPage: React.FC = () => {
   const { t } = useLanguage();
@@ -82,19 +83,9 @@ const RegisterPage: React.FC = () => {
   const progressPct = (step / totalSteps) * 100;
 
   return (
-    <div className="relative overflow-hidden min-h-screen bg-offwhite">
-      {/* Soft diagonal lens background */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          zIndex: 0,
-          backgroundImage: `
-            radial-gradient(120% 200% at 0% 0%, rgba(255, 111, 145, 0.14), transparent 60%),
-            radial-gradient(120% 200% at 100% 100%, rgba(88, 80, 235, 0.18), transparent 60%)
-          `,
-          opacity: 0.4,
-        }}
-      />
+    <div className="relative min-h-screen bg-offwhite overflow-hidden">
+      {/* shared soft background */}
+      <SoftBackground opacity={0.5} />
 
       <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10 md:px-10">
         <div className="w-full max-w-5xl flex flex-col md:flex-row gap-10 items-start md:items-center">

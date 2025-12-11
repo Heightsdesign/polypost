@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import api from "../api";
 import { t } from "../i18n/translations";
 import { useLanguage } from "../i18n/LanguageContext";
+import SoftBackground from "../components/SoftBackground";
 
 type BackendPlan = {
   id: number;
@@ -215,18 +216,9 @@ export default function PricingPage() {
 
 
   return (
-    <div className="relative overflow-hidden min-h-screen bg-offwhite px-4 md:px-8 py-10 md:py-16">
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          zIndex: 0,
-          backgroundImage: `
-            radial-gradient(120% 200% at 0% 0%, rgba(255, 111, 145, 0.12), transparent 60%),
-            radial-gradient(120% 200% at 100% 100%, rgba(88, 80, 235, 0.16), transparent 60%)
-          `,
-          opacity: 0.5,
-        }}
-      />
+     <div className="relative min-h-screen bg-offwhite px-4 md:px-8 py-10 md:py-16 overflow-hidden">
+       <SoftBackground opacity={0.45} />
+
 
       <div className="relative z-10 max-w-6xl mx-auto">
         <header className="text-center mb-10 md:mb-14">
