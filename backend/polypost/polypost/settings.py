@@ -12,7 +12,7 @@ import django_ses
 # PATHS
 # -----------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent            # .../backend/polypost
-PROJECT_ROOT = BASE_DIR.parent.parent                        # .../Postly (root)
+PROJECT_ROOT = BASE_DIR.parent.parent                        # .../Polypost (root)
 
 # Load environment variables from the real project root
 load_dotenv(PROJECT_ROOT / ".env", override=True)
@@ -20,14 +20,28 @@ load_dotenv(PROJECT_ROOT / ".env", override=True)
 # -----------------------------------------------------------------------------
 # BASIC SETTINGS
 # -----------------------------------------------------------------------------
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-me")
-DEBUG = os.getenv("DEBUG", "True") == "True"
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",") if os.getenv("ALLOWED_HOSTS") else []
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY is not set")
+
+DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+
+ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "localhost").split(",") if h.strip()]
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
+
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+REFERRER_POLICY = "strict-origin-when-cross-origin"
 
 # -----------------------------------------------------------------------------
 # THIRD-PARTY SERVICES
 # -----------------------------------------------------------------------------
-STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # -----------------------------------------------------------------------------
@@ -36,7 +50,9 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # -----------------------------------------------------------------------------
 # APPLICATIONS
@@ -65,6 +81,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -98,11 +115,11 @@ WSGI_APPLICATION = "polypost.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("DB_NAME", "polypost_db"),
-        "USER": os.getenv("DB_USER", "polypost_user"),
-        "PASSWORD": os.getenv("DB_PASSWORD", ""),
-        "HOST": os.getenv("DB_HOST", "localhost"),
-        "PORT": os.getenv("DB_PORT", "5432"),
+        "NAME": os.getenv("POSTGRES_DB", "polypost"),
+        "USER": os.getenv("POSTGRES_USER", "polypost_user"),
+        "PASSWORD": os.getenv("POSTGRES_PASSWORD", ""),
+        "HOST": os.getenv("POSTGRES_HOST", "localhost"),
+        "PORT": os.getenv("POSTGRES_PORT", "5432"),
     }
 }
 
@@ -158,7 +175,15 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://polypost-platform.com",
+    "https://www.polypost-platform.com",
 ]
+
+if not DEBUG:
+    CORS_ALLOWED_ORIGINS = [
+        "https://polypost-platform.com",
+        "https://www.polypost-platform.com",
+    ]
 
 # If you want to be quick-and-dirty in dev, you can use:
 # CORS_ALLOW_ALL_ORIGINS = True
@@ -179,8 +204,6 @@ CORS_ALLOW_HEADERS = [
 # Not strictly needed unless you’re sending cookies:
 CORS_ALLOW_CREDENTIALS = False
 
-# Also allow hosts for dev
-ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
 # Where your frontend lives (for links in emails)
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
@@ -188,6 +211,8 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 # Dev email backend: prints emails to the console so you can copy the link
 if DEBUG:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+else:
+    EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django_ses.SESBackend")
 
 
 # -------------------------------------------------------------------------
@@ -197,7 +222,7 @@ STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_FRONTEND_URL = os.getenv("STRIPE_FRONTEND_URL", "http://localhost:5173")
 
-EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django_ses.SESBackend")
+
 
 AWS_SES_REGION_NAME = os.getenv("AWS_SES_REGION_NAME", "eu-west-1")
 AWS_SES_REGION_ENDPOINT = os.getenv(

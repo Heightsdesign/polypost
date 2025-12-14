@@ -320,7 +320,6 @@ class MeProfileView(generics.RetrieveUpdateAPIView):
         return CreatorProfile.objects.get(user=self.request.user)
 
 
-
 class MediaUploadViewSet(viewsets.ModelViewSet):
     queryset = MediaUpload.objects.all()
     serializer_class = MediaUploadSerializer
@@ -338,13 +337,14 @@ class MediaUploadViewSet(viewsets.ModelViewSet):
 
         # 1) per-file size limit
         if file_obj:
-            max_bytes = (plan.max_media_size_mb or 0) * 1024 * 1024
+            max_mb = getattr(plan, "max_upload_mb", 0) or 0
+            max_bytes = max_mb * 1024 * 1024
             if max_bytes and file_obj.size > max_bytes:
                 raise ValidationError(
                     {
                         "detail": (
                             f"This file is too large for your current plan. "
-                            f"Max allowed size: {plan.max_media_size_mb} MB."
+                            f"Max allowed size: {max_mb} MB."
                         )
                     }
                 )
@@ -417,6 +417,7 @@ class GenerateCaptionView(views.APIView):
         increment_usage(request.user, "caption", amount=CAPTIONS_PER_CALL)
         return Response(GeneratedCaptionSerializer(caption_obj).data, status=status.HTTP_201_CREATED)
 
+
 class GenerateIdeasView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -426,47 +427,37 @@ class GenerateIdeasView(views.APIView):
 
         IDEAS_PER_CALL = 5
 
-        # ---------------------------------------------------------------------
-        # 1. Plan usage check
-        # ---------------------------------------------------------------------
+        # 1) Plan usage check
         if not check_usage_allowed(user, "idea", amount=IDEAS_PER_CALL):
             return Response(
                 {"detail": "Idea limit reached for your plan. Upgrade to Pro."},
                 status=403,
             )
 
-        # ---------------------------------------------------------------------
-        # 2. Core profile context
-        # ---------------------------------------------------------------------
-        platform = request.data.get("platform") or getattr(
-            profile, "default_platform", "instagram"
-        )
+        # 2) Profile context (guard profile=None)
+        platform = request.data.get("platform") or getattr(profile, "default_platform", "instagram")
         lang = getattr(profile, "preferred_language", "en")
-        location = ", ".join(filter(None, [profile.city, profile.country]))
+
+        city = getattr(profile, "city", "") if profile else ""
+        country = getattr(profile, "country", "") if profile else ""
+        location = ", ".join([x for x in [city, country] if x])
 
         vibe = getattr(profile, "vibe", "fun")
         tone = getattr(profile, "tone", "casual")
         niche = getattr(profile, "niche", "general creator")
         audience = getattr(profile, "target_audience", "followers")
 
-        # ---------------------------------------------------------------------
-        # 3. Collect trend data and hooks
-        # ---------------------------------------------------------------------
+        # 3) Trend data
         today = date.today()
         seasonal = get_seasonal_hooks(today)
         floating = get_floating_event_hooks(today)
         stub_trends = get_trending_stub_hooks()
 
         latest_trends = list(GlobalTrend.objects.order_by("-fetched_at")[:10])
-        trending_labels = [
-            f"{t.platform}: {t.title}" for t in latest_trends if t.title
-        ]
+        trending_labels = [f"{t.platform}: {t.title}" for t in latest_trends if t.title]
 
-                # ---------------------------------------------------------------------
-        # 4. Build localized AI prompt
-        # ---------------------------------------------------------------------
+        # 4) Prompt
         today_str = today.isoformat()
-
         lines = [
             "You are a social media content strategist.",
             f"Today's date is {today_str}. Always take the current season and major holidays around this date into account.",
@@ -482,7 +473,6 @@ class GenerateIdeasView(views.APIView):
         if location:
             lines.append(f"Location context: {location}")
 
-        # --- Trends block ---
         lines.append("")
         lines.append("We have some FRESH trends from our database. PRIORITIZE these:")
         if trending_labels:
@@ -490,7 +480,6 @@ class GenerateIdeasView(views.APIView):
         else:
             lines.append("- (no DB trends available, use general social media inspiration)")
 
-        # --- Seasonal / recurring hooks ---
         lines.append("")
         lines.append(
             "Seasonal / recurring hooks (especially important if relevant to today's date, "
@@ -499,27 +488,19 @@ class GenerateIdeasView(views.APIView):
         for h in (seasonal + floating + stub_trends):
             lines.append(f"- {h}")
 
-        # --- Instructions ---
         lines.append("")
         lines.append(
             "INSTRUCTIONS:\n"
             "- Generate EXACTLY 5 ideas.\n"
             "- At least 2 ideas MUST be primarily inspired by the latest DB trends listed above.\n"
-            "- Also include AT LEAST 1 idea that is clearly based on a seasonal or recurring hook "
-            "relevant to today's date (e.g. Christmas, New Year, Valentine's, Halloween, etc.) "
-            "when such hooks are listed.\n"
-            "- Seasonal ideas should NOT be generic clichés: make them specific to the creator's niche and audience.\n"
-            "- Keep ideas aligned with the creator's tone and niche.\n"
-            "- If location is provided, use culturally relevant examples or slang.\n"
+            "- Also include AT LEAST 1 idea that is clearly based on a seasonal or recurring hook relevant to today's date.\n"
             "- Return ONLY JSON (array of 5 objects). No markdown, no commentary.\n"
             "- Each object must have: title, description, suggested_caption_starter, hook_used, personal_twist."
         )
 
         prompt = "\n".join(lines)
 
-        # ---------------------------------------------------------------------
-        # 5. OpenAI call
-        # ---------------------------------------------------------------------
+        # 5) OpenAI call (increase max_tokens to reduce truncation)
         try:
             completion = client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -527,27 +508,56 @@ class GenerateIdeasView(views.APIView):
                     {"role": "system", "content": "You generate creative social media ideas."},
                     {"role": "user", "content": prompt},
                 ],
-                max_tokens=650,
+                # 650 is too tight for 5 rich objects; this is a common truncation cause
+                max_tokens=1200,
+                temperature=0.8,
             )
-            raw = completion.choices[0].message.content.strip()
+            raw = (completion.choices[0].message.content or "").strip()
         except Exception as e:
             return Response(
                 {"detail": f"OpenAI error: {e}"},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
-        # ---------------------------------------------------------------------
-        # 6. Parse response (JSON or fallback)
-        # ---------------------------------------------------------------------
-        ideas = raw
-        try:
-            ideas = json.loads(raw)
-        except Exception:
-            pass  # If model returns text instead of JSON, fallback to raw
+        # 6) Parse strictly -> always return list or error
+        def parse_ideas(raw_text: str):
+            # First attempt: parse as-is
+            try:
+                parsed = json.loads(raw_text)
+                return parsed
+            except Exception:
+                pass
 
+            # Second attempt: extract first [...] block (handles occasional extra text)
+            start = raw_text.find("[")
+            end = raw_text.rfind("]")
+            if start != -1 and end != -1 and end > start:
+                try:
+                    return json.loads(raw_text[start : end + 1])
+                except Exception:
+                    pass
+
+            return None
+
+        ideas = parse_ideas(raw)
+
+        # Validate shape
+        if not isinstance(ideas, list) or len(ideas) != IDEAS_PER_CALL:
+            # Do NOT charge usage if we couldn't produce valid ideas
+            tail = raw[-250:] if raw else ""
+            return Response(
+                {
+                    "detail": "Ideas generation failed: model did not return valid JSON array of 5 objects.",
+                    "debug_tail": tail,  # remove this once stable if you don't want to leak content
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        # Only now charge usage
         increment_usage(user, "idea", amount=IDEAS_PER_CALL)
+
         return Response({"ideas": ideas}, status=status.HTTP_200_OK)
-    
+
     
 class PostingSuggestionView(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -744,14 +754,6 @@ class AnalyticsIngestView(views.APIView):
         return Response(data, status=status.HTTP_200_OK)
 
 
-    
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import permissions
-
-from .models import Subscription, Plan
-
-
 class MySubscriptionView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -933,7 +935,8 @@ class ApplyUseCaseTemplateView(views.APIView):
     },
     status=status.HTTP_200_OK,
 )
-# api/views.py
+
+
 class StripeCheckoutSessionView(views.APIView):
     """
     POST /api/billing/create-checkout-session/
@@ -1130,6 +1133,43 @@ class StripeWebhookView(views.APIView):
             sub_obj.save()
 
         return Response(status=200)
+    
+class StripeBillingPortalView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+
+        sub = Subscription.objects.filter(user=user).first()
+        if not sub:
+            return Response({"detail": "No subscription record found."}, status=404)
+
+        # Ensure we have a Stripe customer
+        customer_id = sub.stripe_customer_id
+        if not customer_id:
+            # Try to find existing customer by email (optional but helpful)
+            customers = stripe.Customer.list(email=user.email, limit=1)
+            if customers.data:
+                customer_id = customers.data[0].id
+            else:
+                customer = stripe.Customer.create(email=user.email, metadata={"user_id": str(user.id)})
+                customer_id = customer.id
+
+            sub.stripe_customer_id = customer_id
+            sub.save(update_fields=["stripe_customer_id"])
+
+        return_url = getattr(settings, "STRIPE_PORTAL_RETURN_URL", "").strip()
+        if not return_url:
+            base_frontend = settings.FRONTEND_URL.rstrip("/")
+            return_url = f"{base_frontend}/account"
+
+        session = stripe.billing_portal.Session.create(
+            customer=customer_id,
+            return_url=return_url,
+        )
+
+        return Response({"url": session.url}, status=200)
+
 
 
 class UsageSummaryView(views.APIView):

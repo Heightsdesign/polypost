@@ -26,7 +26,7 @@ function Modal({
       <div
         className="
           relative w-full max-w-xl max-h-[85vh]
-          rounded-3xl bg-white/60 p-5 md:p-6
+          rounded-3xl bg-white shadow-2xl p-5 md:p-6
           shadow-2xl border border-purple/10
           flex flex-col
         "
@@ -333,7 +333,7 @@ export default function Dashboard() {
 
               <div className="grid gap-4 md:grid-cols-3">
                 {/* Ideas card */}
-                <div className="rounded-3xl bg-white/40 backdrop-blur-xl border border-white/20 shadow-md p-5 flex flex-col justify-between">
+                <div className="rounded-3xl bg-white backdrop-blur-xl border border-white/20 shadow-md p-5 flex flex-col justify-between">
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xl">💡</span>
@@ -355,7 +355,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* Upload card */}
-                <div className="rounded-3xl bg-white/40 backdrop-blur-xl border border-white/20 shadow-md p-5 flex flex-col justify-between">
+                <div className="rounded-3xl bg-white backdrop-blur-xl border border-white/20 shadow-md p-5 flex flex-col justify-between">
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xl">🖼️</span>

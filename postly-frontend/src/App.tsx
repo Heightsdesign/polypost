@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import Navbar from "./components/Navbar";
+import NavBar from "./components/NavBar";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Gallery";
@@ -22,7 +22,7 @@ export default function App() {
   return (
     <LanguageProvider>
       <div className="min-h-screen bg-offwhite text-dark flex flex-col">
-        <Navbar />
+        <NavBar />
         <main className="flex-1">
           <Routes>
             {/* Public routes */}

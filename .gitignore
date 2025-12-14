@@ -1,4 +1,28 @@
-.venv/
-.env
-docs/
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Django / runtime
+media/
+staticfiles/
+
+# Celery beat runtime files
+celerybeat-schedule
+celerybeat-schedule-shm
+celerybeat-schedule-wal
+
+# Node
 node_modules/
+dist/
+
+# Env
+.env
+.env.*
+/venv/
+venv/
+
+docs/
+*.sqlite3
+run_backend.bat
